@@ -1,0 +1,24 @@
+# ============================================================================
+# requirements.txt — Python dependencies for the Django backend
+# ============================================================================
+# Core
+Django>=4.2,<5.0
+djangorestframework>=3.14
+django-cors-headers>=4.3
+django-filter>=23.5
+
+# Database — SQLite ships with Python; install psycopg2 when moving to PostgreSQL
+psycopg2-binary>=2.9       # uncomment / keep for PostgreSQL production
+
+# Security & Encryption
+cryptography>=41.0          # AES-256 field-level encryption
+PyJWT>=2.8                  # optional: JWT auth tokens
+
+# Utilities
+python-decouple>=3.8        # .env configuration
+gunicorn>=21.2              # production WSGI server
+whitenoise>=6.5             # static files in production
+
+# Dev / Testing
+pytest-django>=4.5
+factory-boy>=3.3

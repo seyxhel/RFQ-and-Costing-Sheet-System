@@ -1,0 +1,66 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import api from '../services/api';
+
+export type Role = 'ADMIN' | 'MANAGER' | 'PROCUREMENT' | 'FINANCE' | 'VIEWER';
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: Role;
+  department: string;
+  phone: string;
+  is_active: boolean;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+  isAdmin: () => boolean;
+  canApprove: () => boolean;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // On mount: check if session is still valid
+  useEffect(() => {
+    api.get('/accounts/me/')
+      .then((res) => setUser(res.data))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const login = useCallback(async (username: string, password: string) => {
+    const res = await api.post('/accounts/login/', { username, password });
+    setUser(res.data);
+  }, []);
+
+  const logout = useCallback(async () => {
+    try { await api.post('/accounts/logout/'); } catch {}
+    setUser(null);
+    window.location.href = '/login';
+  }, []);
+
+  const isAdmin = useCallback(() => user?.role === 'ADMIN' || (user as any)?.is_superuser === true, [user]);
+  const canApprove = useCallback(() => ['ADMIN', 'MANAGER'].includes(user?.role || ''), [user]);
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, canApprove }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}
