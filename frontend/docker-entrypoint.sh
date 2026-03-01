@@ -4,8 +4,8 @@ set -e
 # Substitute environment variables in nginx config
 export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 
-# Extract DNS resolver from the container's /etc/resolv.conf (works on Railway, Docker, etc.)
-export DNS_RESOLVER=$(grep -m1 '^nameserver' /etc/resolv.conf | awk '{print $2}')
+# Extract IPv4 DNS resolver from /etc/resolv.conf (skip IPv6 — nginx can't use them with ipv6=off)
+export DNS_RESOLVER=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 if [ -z "$DNS_RESOLVER" ]; then
     export DNS_RESOLVER="8.8.8.8"
 fi
