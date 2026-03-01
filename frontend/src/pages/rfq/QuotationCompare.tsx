@@ -92,7 +92,7 @@ export default function QuotationCompare() {
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                   <DollarSign className="w-4 h-4 text-[#3BC25B]" />
-                  <div><p className="text-[10px] text-gray-500 uppercase">Total</p><p className="text-sm font-bold text-gray-900 dark:text-white">${Number(q.total_amount || 0).toLocaleString()}</p></div>
+                  <div><p className="text-[10px] text-gray-500 uppercase">Total</p><p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(q.total_amount || 0).toLocaleString()}</p></div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                   <Clock className="w-4 h-4 text-blue-500" />
@@ -168,7 +168,7 @@ export default function QuotationCompare() {
                         <td key={q.id} className="px-6 py-4 text-center">
                           {priceEntry && priceEntry.unit_price ? (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold ${isBest ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'text-gray-800 dark:text-gray-200'}`}>
-                              {isBest && <CheckCircle className="w-3.5 h-3.5" />}${Number(priceEntry.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              {isBest && <CheckCircle className="w-3.5 h-3.5" />}₱{Number(priceEntry.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                           ) : <span className="text-gray-400">—</span>}
                         </td>
@@ -181,7 +181,7 @@ export default function QuotationCompare() {
                 <tr className="bg-gray-50 dark:bg-gray-700/50 font-bold">
                   <td className="px-6 py-4 text-gray-900 dark:text-white" colSpan={2}>Grand Total</td>
                   {quotations.map((q: any) => (
-                    <td key={q.id} className="px-6 py-4 text-center text-gray-900 dark:text-white">${Number(q.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td key={q.id} className="px-6 py-4 text-center text-gray-900 dark:text-white">₱{Number(q.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   ))}
                 </tr>
               </tfoot>

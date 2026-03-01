@@ -65,3 +65,25 @@ class LoginSerializer(serializers.Serializer):
     """Simple username + password login."""
     username = serializers.CharField()
     password = serializers.CharField()
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """Self-service profile update — users can update their own info."""
+
+    class Meta:
+        model = User
+        fields = [
+            "first_name", "last_name", "email", "phone", "department",
+        ]
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Self-service password change — requires current password."""
+    current_password = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+    confirm_password = serializers.CharField(min_length=8)
+
+    def validate(self, data):
+        if data["new_password"] != data["confirm_password"]:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        return data

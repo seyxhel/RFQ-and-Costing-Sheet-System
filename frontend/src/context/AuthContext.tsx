@@ -22,6 +22,7 @@ interface AuthContextValue {
   logout: () => void;
   isAdmin: () => boolean;
   canApprove: () => boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,8 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = useCallback(() => user?.role === 'ADMIN' || (user as any)?.is_superuser === true, [user]);
   const canApprove = useCallback(() => ['ADMIN', 'MANAGER'].includes(user?.role || ''), [user]);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await api.get('/accounts/me/');
+      setUser(res.data);
+    } catch {
+      // keep existing user data on failure
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, canApprove }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, canApprove, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,6 +9,11 @@ import {
   Users,
   Settings,
   LogOut,
+  Package,
+  FolderOpen,
+  Wallet,
+  ShoppingCart,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,8 +44,13 @@ export function Sidebar({ currentPath, onNavigate, onExpandChange }: SidebarProp
     { id: 'rfq-new', label: 'New RFQ', icon: ClipboardList, path: '/rfq/new' },
     { id: 'suppliers', label: 'Suppliers', icon: Truck, path: '/suppliers' },
     { id: 'quotations', label: 'Quotations', icon: FileText, path: '/quotations' },
+    { id: 'products', label: 'Product Catalog', icon: Package, path: '/products', section: 'Products' },
+    { id: 'categories', label: 'Categories', icon: FolderOpen, path: '/products/categories' },
     { id: 'costing', label: 'Costing Sheets', icon: Calculator, path: '/costing', section: 'Costing Module' },
     { id: 'costing-new', label: 'New Costing Sheet', icon: FlaskConical, path: '/costing/new' },
+    { id: 'budgets', label: 'Budgets', icon: Wallet, path: '/budgets', section: 'Budget & Procurement' },
+    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders' },
+    { id: 'variance', label: 'Variance Monitor', icon: BarChart3, path: '/variance' },
     ...(isAdmin() ? [
       { id: 'users', label: 'Manage Users', icon: Users, path: '/users', section: 'Admin' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },

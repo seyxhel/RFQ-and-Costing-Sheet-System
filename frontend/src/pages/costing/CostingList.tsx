@@ -85,9 +85,9 @@ export default function CostingList() {
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{s.title}</td>
                   <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{s.product_name || '—'}</td>
                   <td className="px-6 py-4"><StatusBadge status={s.status || 'draft'} /></td>
-                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">${Number(s.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">₱{Number(s.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="px-6 py-4 text-[#0E8F79] font-medium">{s.margin_percentage ? `${s.margin_percentage}%` : '—'}</td>
-                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">${Number(s.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">₱{Number(s.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="px-6 py-4 text-right relative" onClick={(e) => e.stopPropagation()}>
                     <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === s.id ? null : s.id); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><MoreHorizontal className="w-5 h-5" /></button>
                     {openMenuId === s.id && (

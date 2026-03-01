@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
 import { rfqAPI } from '../../services/rfqService';
 import { supplierAPI } from '../../services/rfqService';
+import { productAPI } from '../../services/productService';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 
@@ -13,19 +14,21 @@ export default function RFQForm() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ title: '', description: '', deadline: '', suppliers: [] as number[] });
-  const [items, setItems] = useState<any[]>([{ item_name: '', quantity: 1, unit: 'pcs', specifications: '' }]);
+  const [items, setItems] = useState<any[]>([{ product: '', item_name: '', quantity: 1, unit: 'pcs', specifications: '' }]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     supplierAPI.list().then((r) => setSuppliers(r.data.results || r.data)).catch(() => {});
+    productAPI.list().then((r) => setProducts(r.data.results || r.data)).catch(() => {});
     if (isEdit) {
       setLoading(true);
       rfqAPI.get(Number(id)).then((r) => {
         const d = r.data;
         setForm({ title: d.title, description: d.description || '', deadline: d.deadline || '', suppliers: d.suppliers || [] });
-        if (d.items?.length) setItems(d.items.map((it: any) => ({ item_name: it.item_name || '', quantity: it.quantity || 1, unit: it.unit || 'pcs', specifications: it.specifications || '' })));
+        if (d.items?.length) setItems(d.items.map((it: any) => ({ product: it.product || '', item_name: it.item_name || '', quantity: it.quantity || 1, unit: it.unit || 'pcs', specifications: it.specifications || '' })));
         setLoading(false);
       }).catch(() => { toast.error('Failed to load RFQ'); navigate('/rfq'); });
     }
@@ -36,17 +39,35 @@ export default function RFQForm() {
   };
 
   const handleItemChange = (idx: number, field: string, value: any) => {
-    setItems((prev) => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+    setItems((prev) => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const updated = { ...item, [field]: value };
+      if (field === 'product' && value) {
+        const prod = products.find((p) => p.id === Number(value));
+        if (prod) {
+          updated.item_name = prod.name;
+          updated.unit = prod.unit || item.unit;
+          if (prod.specifications) updated.specifications = prod.specifications;
+        }
+      }
+      return updated;
+    }));
   };
 
-  const addItem = () => setItems((p) => [...p, { item_name: '', quantity: 1, unit: 'pcs', specifications: '' }]);
+  const addItem = () => setItems((p) => [...p, { product: '', item_name: '', quantity: 1, unit: 'pcs', specifications: '' }]);
   const removeItem = (idx: number) => setItems((p) => p.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, items };
+      const payload = {
+        ...form,
+        items: items.map((it) => ({
+          ...it,
+          product: it.product ? Number(it.product) : null,
+        })),
+      };
       if (isEdit) {
         await rfqAPI.update(Number(id), payload);
         toast.success('RFQ updated');
@@ -107,11 +128,18 @@ export default function RFQForm() {
           <div className="space-y-4">
             {items.map((item, idx) => (
               <div key={idx} className="grid grid-cols-12 gap-3 items-end p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <div className="col-span-4">
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Product</label>
+                  <select value={item.product} onChange={(e) => handleItemChange(idx, 'product', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                    <option value="">— or type manually —</option>
+                    {products.filter((p) => p.is_active).map((p: any) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-3">
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Item Name</label>
                   <input value={item.item_name} onChange={(e) => handleItemChange(idx, 'item_name', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1">
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Qty</label>
                   <input type="number" min={1} value={item.quantity} onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
                 </div>
@@ -119,7 +147,7 @@ export default function RFQForm() {
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit</label>
                   <input value={item.unit} onChange={(e) => handleItemChange(idx, 'unit', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
                 </div>
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Specifications</label>
                   <input value={item.specifications} onChange={(e) => handleItemChange(idx, 'specifications', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
                 </div>
