@@ -23,11 +23,13 @@ class SupplierSerializer(serializers.ModelSerializer):
 # RFQ Items (nested inside RFQ)
 # --------------------------------------------------------------------------
 class RFQItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True, default="")
+
     class Meta:
         model = RFQItem
         fields = [
-            "id", "item_name", "description", "quantity", "unit",
-            "specifications", "inventory_item_id",
+            "id", "product", "product_name", "item_name", "description",
+            "quantity", "unit", "specifications", "inventory_item_id",
         ]
         read_only_fields = ["id"]
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/layout/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -23,9 +24,28 @@ import CostingDetail from './pages/costing/CostingDetail';
 import ScenarioList from './pages/costing/ScenarioList';
 import ScenarioForm from './pages/costing/ScenarioForm';
 
+// Products module
+import ProductList from './pages/products/ProductList';
+import ProductForm from './pages/products/ProductForm';
+import CategoryList from './pages/products/CategoryList';
+
+// Budget module
+import BudgetList from './pages/budget/BudgetList';
+import BudgetForm from './pages/budget/BudgetForm';
+import BudgetDetail from './pages/budget/BudgetDetail';
+
+// Procurement module
+import POList from './pages/procurement/POList';
+import POForm from './pages/procurement/POForm';
+import PODetail from './pages/procurement/PODetail';
+import VarianceDashboard from './pages/procurement/VarianceDashboard';
+
 // Users
 import UserList from './pages/users/UserList';
 import UserForm from './pages/users/UserForm';
+
+// Settings
+import Settings from './pages/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -85,13 +105,36 @@ function AppRoutes() {
                 <Route path="/costing/:sheetId/scenarios" element={<ScenarioList />} />
                 <Route path="/costing/:sheetId/scenarios/new" element={<ScenarioForm />} />
 
+                {/* Products */}
+                <Route path="/products" element={<ProductList />} />
+                <Route path="/products/new" element={<ProductForm />} />
+                <Route path="/products/:id/edit" element={<ProductForm />} />
+                <Route path="/products/categories" element={<CategoryList />} />
+
+                {/* Budgets */}
+                <Route path="/budgets" element={<BudgetList />} />
+                <Route path="/budgets/new" element={<BudgetForm />} />
+                <Route path="/budgets/:id" element={<BudgetDetail />} />
+                <Route path="/budgets/:id/edit" element={<BudgetForm />} />
+
+                {/* Purchase Orders & Procurement */}
+                <Route path="/purchase-orders" element={<POList />} />
+                <Route path="/purchase-orders/new" element={<POForm />} />
+                <Route path="/purchase-orders/:id" element={<PODetail />} />
+                <Route path="/purchase-orders/:id/edit" element={<POForm />} />
+
+                {/* Variance Dashboard */}
+                <Route path="/variance" element={<VarianceDashboard />} />
+
                 {/* Users (admin) */}
                 <Route path="/users" element={<AdminRoute><UserList /></AdminRoute>} />
                 <Route path="/users/new" element={<AdminRoute><UserForm /></AdminRoute>} />
                 <Route path="/users/:id/edit" element={<AdminRoute><UserForm /></AdminRoute>} />
 
-                {/* Catch-all */}
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* Settings */}
+                <Route path="/settings" element={<Settings />} />
+
+                {/* Catch-all */}                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
@@ -104,10 +147,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Toaster position="top-right" richColors closeButton />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+          <Toaster position="top-right" richColors closeButton />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

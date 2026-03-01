@@ -8,7 +8,10 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer, LoginSerializer
+from .serializers import (
+    UserSerializer, UserCreateSerializer, UserUpdateSerializer,
+    LoginSerializer, ProfileUpdateSerializer, ChangePasswordSerializer,
+)
 from .permissions import IsAdminRole
 
 User = get_user_model()
@@ -67,6 +70,43 @@ def me_view(request):
     Return the currently authenticated user's profile.
     """
     return Response(UserSerializer(request.user).data)
+
+
+@api_view(["PUT", "PATCH"])
+@permission_classes([permissions.IsAuthenticated])
+def update_profile_view(request):
+    """
+    PUT/PATCH /api/v1/accounts/profile/
+    Update the currently authenticated user's profile fields.
+    """
+    serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(UserSerializer(request.user).data)
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def change_password_view(request):
+    """
+    POST /api/v1/accounts/change-password/
+    Change the currently authenticated user's password.
+    Requires current password for verification.
+    """
+    serializer = ChangePasswordSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    if not request.user.check_password(serializer.validated_data["current_password"]):
+        return Response(
+            {"current_password": ["Current password is incorrect."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    request.user.set_password(serializer.validated_data["new_password"])
+    request.user.save()
+    # Re-authenticate to keep the session alive
+    login(request, request.user)
+    return Response({"detail": "Password changed successfully."})
 
 
 # --------------------------------------------------------------------------

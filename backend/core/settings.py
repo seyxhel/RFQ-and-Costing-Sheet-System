@@ -47,8 +47,11 @@ INSTALLED_APPS = [
 
     # Project apps
     "accounts",                 # User management, RBAC, authentication
+    "products",                 # Product/Item catalog
     "rfq",                      # Request for Quotation module
     "costing",                  # Costing Sheet module
+    "budget",                   # Budget allocation & approval
+    "procurement",              # Purchase Orders & actual cost tracking
 ]
 
 # --------------------------------------------------------------------------
