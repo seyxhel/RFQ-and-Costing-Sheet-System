@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                 ('target_margin_percent', models.DecimalField(decimal_places=2, default=20.0, help_text='Desired profit margin percentage', max_digits=5)),
                 ('selling_price', models.DecimalField(decimal_places=2, default=0, help_text='Calculated: total_cost / (1 - margin%)', max_digits=14)),
                 ('actual_margin_percent', models.DecimalField(decimal_places=2, default=0, max_digits=5)),
-                ('currency', models.CharField(default='USD', max_length=10)),
+                ('currency', models.CharField(default='PHP', max_length=10)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='costing_sheets_approved', to=settings.AUTH_USER_MODEL)),

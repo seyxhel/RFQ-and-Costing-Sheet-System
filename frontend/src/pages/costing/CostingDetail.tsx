@@ -117,13 +117,13 @@ export default function CostingDetail() {
                       <td className="px-4 py-3 text-gray-800 dark:text-gray-200">{it.description}</td>
                       <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{it.quantity}</td>
                       <td className="px-4 py-3 text-gray-500">{it.unit}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">${Number(it.unit_cost).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">${(Number(it.quantity) * Number(it.unit_cost)).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">₱{Number(it.unit_cost).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">₱{(Number(it.quantity) * Number(it.unit_cost)).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="border-t-2 border-gray-200 dark:border-gray-600 font-bold">
-                  <tr><td colSpan={5} className="px-4 py-3 text-gray-900 dark:text-white">Total</td><td className="px-4 py-3 text-right text-gray-900 dark:text-white">${Number(sheet.total_cost || 0).toFixed(2)}</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-3 text-gray-900 dark:text-white">Total</td><td className="px-4 py-3 text-right text-gray-900 dark:text-white">₱{Number(sheet.total_cost || 0).toFixed(2)}</td></tr>
                 </tfoot>
               </table>
             </div>
@@ -139,7 +139,7 @@ export default function CostingDetail() {
                   <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${COST_TYPE_LABELS[name] || name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
                     {pieData.map((entry, i) => <Cell key={i} fill={CATEGORY_COLORS[entry.name] || '#6B7280'} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
+                  <Tooltip formatter={(v: number) => `₱${v.toFixed(2)}`} />
                 </PieChart>
               </ResponsiveContainer>
             </Card>
@@ -204,11 +204,11 @@ export default function CostingDetail() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                             <p className="text-[10px] text-gray-500 uppercase">Total Cost</p>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">${Number(v.snapshot_data.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(v.snapshot_data.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                           </div>
                           <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                             <p className="text-[10px] text-gray-500 uppercase">Selling Price</p>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">${Number(v.snapshot_data.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(v.snapshot_data.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                           </div>
                           <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                             <p className="text-[10px] text-gray-500 uppercase">Margin</p>

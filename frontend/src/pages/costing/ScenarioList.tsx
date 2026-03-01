@@ -59,17 +59,20 @@ export default function ScenarioList() {
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase">Adjusted Cost</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">${Number(s.projected_total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase">Sell Price</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">${Number(s.projected_selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(s.projected_total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Sum of line items</p>
                 </div>
                 <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase">Margin</p>
-                  <p className="text-sm font-bold text-[#0E8F79]">{s.projected_margin_percent || '—'}%</p>
+                  <p className="text-sm font-bold text-[#0E8F79]">{Number(s.projected_margin_percent || 0).toFixed(2)}%</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Applied percentage</p>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg col-span-2">
+                  <p className="text-[10px] text-gray-500 uppercase">Selling Price</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(s.projected_selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Cost × (1 + Margin%)</p>
+                </div>
+                <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg col-span-2">
                   <p className="text-[10px] text-gray-500 uppercase">Created</p>
                   <p className="text-sm font-bold text-gray-900 dark:text-white">{s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}</p>
                 </div>

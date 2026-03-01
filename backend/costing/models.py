@@ -64,7 +64,7 @@ class CostingSheet(models.Model):
         max_digits=5, decimal_places=2, default=0,
     )
 
-    currency = models.CharField(max_length=10, default="USD")
+    currency = models.CharField(max_length=10, default="PHP")
 
     # Integration: link to the RFQ whose quotation feeds material costs
     rfq = models.ForeignKey(
@@ -260,6 +260,13 @@ class Scenario(models.Model):
         """
         Apply overrides to the costing sheet line items and recalculate totals.
         Does NOT modify the original costing sheet — read-only projection.
+
+        Formula:
+          Adjusted Cost   = sum of (unit_cost × quantity) for every line item
+                            after overrides are applied
+          Selling Price   = Adjusted Cost × (1 + margin%)
+          Margin          = overrides["__margin__"] if present,
+                            otherwise the costing sheet's target_margin_percent
         """
         from decimal import Decimal
 
@@ -277,15 +284,19 @@ class Scenario(models.Model):
                 quantity = item.quantity
             total += unit_cost * quantity
 
+        # Adjusted Cost = raw total of line items (no stacking of previous prices)
         self.projected_total_cost = total
-        margin = self.costing_sheet.target_margin_percent
-        if margin < 100:
-            self.projected_selling_price = total / (1 - margin / 100)
-        else:
-            self.projected_selling_price = total
 
-        if self.projected_selling_price > 0:
-            self.projected_margin_percent = (
-                (self.projected_selling_price - total) / self.projected_selling_price * 100
-            )
+        # Margin: allow override via special "__margin__" key in overrides
+        if "__margin__" in self.overrides:
+            margin = Decimal(str(self.overrides["__margin__"]))
+        else:
+            margin = self.costing_sheet.target_margin_percent
+
+        # Selling Price = Adjusted Cost × (1 + Margin%)
+        self.projected_selling_price = total * (1 + margin / 100)
+
+        # Margin = the applied percentage directly
+        self.projected_margin_percent = margin
+
         self.save()

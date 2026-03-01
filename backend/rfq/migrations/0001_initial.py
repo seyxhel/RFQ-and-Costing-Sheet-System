@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('quotation_number', models.CharField(blank=True, default='', max_length=50)),
                 ('status', models.CharField(choices=[('PENDING', 'Pending Review'), ('ACCEPTED', 'Accepted'), ('REJECTED', 'Rejected')], default='PENDING', max_length=20)),
                 ('total_amount', models.DecimalField(decimal_places=2, default=0, max_digits=14)),
-                ('currency', models.CharField(default='USD', max_length=10)),
+                ('currency', models.CharField(default='PHP', max_length=10)),
                 ('delivery_days', models.PositiveIntegerField(default=0, help_text='Estimated delivery time in days')),
                 ('payment_terms', models.CharField(blank=True, default='', max_length=255)),
                 ('warranty_terms', models.CharField(blank=True, default='', max_length=255)),

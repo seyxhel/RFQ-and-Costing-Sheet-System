@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                 ('status', models.CharField(choices=[('DRAFT', 'Draft'), ('ISSUED', 'Issued'), ('PARTIALLY_RECEIVED', 'Partially Received'), ('COMPLETED', 'Completed'), ('CANCELLED', 'Cancelled')], default='DRAFT', max_length=25)),
                 ('estimated_total', models.DecimalField(decimal_places=2, default=0, max_digits=14)),
                 ('actual_total', models.DecimalField(decimal_places=2, default=0, max_digits=14)),
-                ('currency', models.CharField(default='USD', max_length=10)),
+                ('currency', models.CharField(default='PHP', max_length=10)),
                 ('issue_date', models.DateField(auto_now_add=True)),
                 ('expected_delivery', models.DateField(blank=True, null=True)),
                 ('actual_delivery', models.DateField(blank=True, null=True)),

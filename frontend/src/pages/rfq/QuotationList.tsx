@@ -99,7 +99,7 @@ export default function QuotationList() {
                       <span className="text-gray-800 dark:text-gray-200">{q.supplier_name || 'Supplier #' + q.supplier}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">${Number(q.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">₱{Number(q.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{q.delivery_days ? `${q.delivery_days} days` : '—'}</td>
                   <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor(q.status)}`}>{q.status}</span></td>
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{q.submitted_at ? new Date(q.submitted_at).toLocaleDateString() : '—'}</td>

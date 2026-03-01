@@ -34,7 +34,7 @@ class Budget(models.Model):
         max_digits=14, decimal_places=2, default=0,
         help_text="Allocated - Spent",
     )
-    currency = models.CharField(max_length=10, default="USD")
+    currency = models.CharField(max_length=10, default="PHP")
 
     # Links
     rfq = models.ForeignKey(

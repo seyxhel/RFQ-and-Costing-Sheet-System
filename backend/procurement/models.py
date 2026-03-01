@@ -44,7 +44,7 @@ class PurchaseOrder(models.Model):
     # Financial
     estimated_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     actual_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    currency = models.CharField(max_length=10, default="USD")
+    currency = models.CharField(max_length=10, default="PHP")
 
     # Dates
     issue_date = models.DateField(auto_now_add=True)

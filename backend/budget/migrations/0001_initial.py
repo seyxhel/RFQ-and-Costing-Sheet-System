@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
                 ('allocated_amount', models.DecimalField(decimal_places=2, default=0, help_text='Total approved budget amount', max_digits=14)),
                 ('spent_amount', models.DecimalField(decimal_places=2, default=0, help_text='Total actually spent (from PO actuals)', max_digits=14)),
                 ('remaining_amount', models.DecimalField(decimal_places=2, default=0, help_text='Allocated - Spent', max_digits=14)),
-                ('currency', models.CharField(default='USD', max_length=10)),
+                ('currency', models.CharField(default='PHP', max_length=10)),
                 ('approved_at', models.DateTimeField(blank=True, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
