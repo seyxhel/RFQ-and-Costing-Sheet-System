@@ -7,6 +7,7 @@
 # ============================================================================
 
 import os
+import dj_database_url
 from pathlib import Path
 
 # Try to load .env values; fall back gracefully if python-decouple is missing
@@ -101,26 +102,34 @@ WSGI_APPLICATION = "core.wsgi.application"
 #   DB_PORT=5432
 # --------------------------------------------------------------------------
 
-DB_ENGINE = env_config("DB_ENGINE", default="django.db.backends.sqlite3")
+# DATABASE_URL takes priority (Railway / Heroku / Render style)
+# Falls back to individual DB_* env vars, then SQLite for local dev.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-if DB_ENGINE == "django.db.backends.sqlite3":
+if DATABASE_URL:
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600),
     }
 else:
-    DATABASES = {
-        "default": {
-            "ENGINE": DB_ENGINE,
-            "NAME": env_config("DB_NAME", default="business_system"),
-            "USER": env_config("DB_USER", default="postgres"),
-            "PASSWORD": env_config("DB_PASSWORD", default=""),
-            "HOST": env_config("DB_HOST", default="localhost"),
-            "PORT": env_config("DB_PORT", default="5432"),
+    DB_ENGINE = env_config("DB_ENGINE", default="django.db.backends.sqlite3")
+    if DB_ENGINE == "django.db.backends.sqlite3":
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
         }
-    }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": DB_ENGINE,
+                "NAME": env_config("DB_NAME", default="business_system"),
+                "USER": env_config("DB_USER", default="postgres"),
+                "PASSWORD": env_config("DB_PASSWORD", default=""),
+                "HOST": env_config("DB_HOST", default="localhost"),
+                "PORT": env_config("DB_PORT", default="5432"),
+            }
+        }
 
 # --------------------------------------------------------------------------
 # Auth — custom user model
@@ -159,14 +168,14 @@ REST_FRAMEWORK = {
 # --------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env_config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3000,http://127.0.0.1:3000",
+    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins — must include the frontend dev server
+# CSRF trusted origins — must include the frontend dev server + Railway domains
 CSRF_TRUSTED_ORIGINS = env_config(
     "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost:3000,http://127.0.0.1:3000",
+    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
 ).split(",")
 
 # --------------------------------------------------------------------------
@@ -193,11 +202,20 @@ FIELD_ENCRYPTION_KEY = env_config("FIELD_ENCRYPTION_KEY", default="")
 # HTTPS / Security headers (enable in production)
 # --------------------------------------------------------------------------
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Railway terminates SSL at the proxy; don't redirect inside the container
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # Allow Railway-assigned hosts
+    CSRF_COOKIE_DOMAIN = os.environ.get("CSRF_COOKIE_DOMAIN", None)
+    SESSION_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SAMESITE = "None"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# WhiteNoise — serve static files with compression
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

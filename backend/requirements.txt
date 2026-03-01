@@ -8,7 +8,8 @@ django-cors-headers>=4.3
 django-filter>=23.5
 
 # Database — SQLite ships with Python; install psycopg2 when moving to PostgreSQL
-psycopg2-binary>=2.9       # uncomment / keep for PostgreSQL production
+psycopg2-binary>=2.9       # PostgreSQL adapter
+dj-database-url>=2.1       # Parse DATABASE_URL env var
 
 # Security & Encryption
 cryptography>=41.0          # AES-256 field-level encryption
