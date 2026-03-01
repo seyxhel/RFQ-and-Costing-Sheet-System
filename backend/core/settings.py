@@ -166,17 +166,21 @@ REST_FRAMEWORK = {
 # --------------------------------------------------------------------------
 # CORS (allow React dev server)
 # --------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = env_config(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+CORS_ALLOWED_ORIGINS = [
+    o.strip().rstrip("/") for o in env_config(
+        "CORS_ALLOWED_ORIGINS",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",") if o.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF trusted origins — must include the frontend dev server + Railway domains
-CSRF_TRUSTED_ORIGINS = env_config(
-    "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+CSRF_TRUSTED_ORIGINS = [
+    o.strip().rstrip("/") for o in env_config(
+        "CSRF_TRUSTED_ORIGINS",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",") if o.strip()
+]
 
 # --------------------------------------------------------------------------
 # Internationalization
