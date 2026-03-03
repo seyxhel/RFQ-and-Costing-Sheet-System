@@ -106,46 +106,70 @@ class RFQViewSet(viewsets.ModelViewSet):
         items = rfq.items.all().order_by("item_number")
         quotations = rfq.quotations.select_related("supplier").prefetch_related("items")
 
+        # Build quotation summary list (for supplier cards)
+        quotation_list = []
+        for q in quotations:
+            quotation_list.append({
+                "id": q.id,
+                "supplier": q.supplier_id,
+                "supplier_name": q.supplier.name,
+                "quotation_number": q.quotation_number,
+                "status": q.status,
+                "total_amount": str(q.total_amount),
+                "currency": q.currency,
+                "delivery_days": q.delivery_days,
+                "payment_terms": q.payment_terms,
+                "validity_days": q.validity_days,
+                "supplier_rating": str(q.supplier.rating),
+            })
+
+        # Build item-level comparison matrix
         matrix = []
         for item in items:
             row = {
-                "rfq_item": {
-                    "id": item.id,
-                    "item_number": item.item_number,
-                    "item_name": item.item_name,
-                    "brand": item.brand,
-                    "model_number": item.model_number,
-                    "description": item.description,
-                    "quantity": str(item.quantity),
-                    "unit": item.unit,
-                },
-                "supplier_quotes": [],
+                "rfq_item_id": item.id,
+                "item_number": item.item_number,
+                "item_name": item.item_name,
+                "brand": item.brand,
+                "model_number": item.model_number,
+                "description": item.description,
+                "quantity": str(item.quantity),
+                "unit": item.unit,
+                "quotes": [],
             }
             for quot in quotations:
                 qi = quot.items.filter(rfq_item=item).first()
                 if qi:
-                    row["supplier_quotes"].append({
+                    row["quotes"].append({
                         "supplier_id": quot.supplier_id,
                         "supplier_name": quot.supplier.name,
                         "quotation_id": quot.id,
-                        **QuotationItemSerializer(qi).data,
+                        "unit_price": str(qi.unit_price),
+                        "amount": str(qi.amount),
+                        "brand": qi.brand,
+                        "model_number": qi.model_number,
+                        "description": qi.description,
+                        "offer_type": qi.offer_type,
+                        "vat_type": qi.vat_type,
+                        "availability": qi.availability,
+                        "warranty_period": qi.warranty_period,
+                        "delivery_days": qi.delivery_days,
+                        "notes": qi.notes,
                     })
                 else:
-                    row["supplier_quotes"].append({
+                    row["quotes"].append({
                         "supplier_id": quot.supplier_id,
                         "supplier_name": quot.supplier.name,
                         "quotation_id": quot.id,
+                        "unit_price": None,
                         "no_quote": True,
                     })
             matrix.append(row)
 
         return Response({
             "rfq": RFQListSerializer(rfq).data,
-            "suppliers": [
-                {"id": q.supplier_id, "name": q.supplier.name, "quotation_id": q.id}
-                for q in quotations
-            ],
-            "matrix": matrix,
+            "quotations": quotation_list,
+            "comparison_matrix": matrix,
         })
 
 
@@ -173,6 +197,11 @@ class QuotationViewSet(viewsets.ModelViewSet):
         quotation = self.get_object()
         quotation.status = Quotation.Status.ACCEPTED
         quotation.save(update_fields=["status"])
+        # Auto-reject all other PENDING quotations for the same RFQ
+        Quotation.objects.filter(
+            rfq=quotation.rfq,
+            status=Quotation.Status.PENDING,
+        ).exclude(pk=quotation.pk).update(status=Quotation.Status.REJECTED)
         return Response(QuotationDetailSerializer(quotation).data)
 
     @action(detail=True, methods=["post"])

@@ -5,7 +5,7 @@ import { GreenButton } from '../../components/ui/GreenButton';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { costingAPI } from '../../services/costingService';
 import { toast } from 'sonner';
-import { ArrowLeft, Pencil, RefreshCw, Camera, History, ChevronDown, ChevronUp, CheckCircle, Send, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Pencil, RefreshCw, Camera, History, ChevronDown, ChevronUp, CheckCircle, Send, FlaskConical, Download } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const CATEGORY_COLORS = ['#3BC25B', '#3B82F6', '#A855F7', '#F59E0B', '#EF4444', '#06B6D4', '#F97316'];
@@ -48,6 +48,119 @@ export default function CostingDetail() {
     }).catch(() => toast.error('Snapshot failed'));
   };
 
+  /* ======== Export to CSV ======== */
+  const exportCSV = () => {
+    if (!sheet) return;
+    const esc = (v: any) => { const s = String(v ?? '').replace(/"/g, '""'); return `"${s}"`; };
+    const fmtN = (v: any) => Number(v || 0).toFixed(2);
+    const rows: string[] = [];
+    const items_ = sheet.line_items || [];
+    const marginLevels_ = sheet.margin_levels || [];
+
+    // --- Section 1: Sheet Info ---
+    rows.push('COSTING SHEET REPORT');
+    rows.push('');
+    rows.push(`Sheet Number,${esc(sheet.sheet_number)}`);
+    rows.push(`Title,${esc(sheet.title)}`);
+    rows.push(`Project,${esc(sheet.project_title)}`);
+    rows.push(`Client,${esc(sheet.client_name)}`);
+    rows.push(`Status,${esc(sheet.status)}`);
+    rows.push(`Version,v${sheet.version || 1}`);
+    rows.push(`Date,${esc(sheet.date || '')}`);
+    rows.push(`Warranty,${esc(sheet.warranty || '')}`);
+    rows.push(`Created By,${esc(sheet.created_by_name || '')}`);
+    rows.push('');
+
+    // --- Section 2: Summary ---
+    rows.push('COST SUMMARY');
+    rows.push(`Total Cost,${fmtN(sheet.total_cost)}`);
+    rows.push(`Contingency %,${sheet.contingency_percent}%`);
+    rows.push(`Contingency Amount,${fmtN(sheet.contingency_amount)}`);
+    rows.push(`Total Project Cost,${fmtN(sheet.total_project_cost)}`);
+    rows.push(`VAT Rate,${sheet.vat_rate}%`);
+    rows.push('');
+
+    // --- Section 3: Line Items ---
+    rows.push('COST BREAKDOWN (LINE ITEMS)');
+    rows.push(['#', 'Category', 'Description', 'Input VAT', 'Amount'].map(esc).join(','));
+    items_.forEach((it: any, idx: number) => {
+      rows.push([idx + 1, it.category_name || '', it.description || '', it.has_input_vat ? 'Yes' : 'No', fmtN(it.total_cost)].map(esc).join(','));
+    });
+    rows.push(['', '', 'Total Cost', '', fmtN(sheet.total_cost)].map(esc).join(','));
+    rows.push(['', '', `Contingency (${sheet.contingency_percent}%)`, '', fmtN(sheet.contingency_amount)].map(esc).join(','));
+    rows.push(['', '', 'Total Project Cost', '', fmtN(sheet.total_project_cost)].map(esc).join(','));
+    rows.push('');
+
+    // --- Section 4: Margin Levels ---
+    marginLevels_.forEach((ml_: any) => {
+      const label = MARGIN_DISPLAY[ml_.label] || ml_.label;
+      rows.push(`MARGIN LEVEL: ${label.toUpperCase()}`);
+      rows.push('');
+
+      // Selling Price Build-Up
+      rows.push('Selling Price Build-Up');
+      rows.push(['Component', 'Rate', 'Amount'].map(esc).join(','));
+      rows.push(['Total Project Cost', '', fmtN(sheet.total_project_cost)].map(esc).join(','));
+      rows.push(['Facilitation', `${ml_.facilitation_percent}%`, fmtN(ml_.facilitation_amount)].map(esc).join(','));
+      rows.push(['Desired Margin', `${ml_.desired_margin_percent}%`, fmtN(ml_.desired_margin_amount)].map(esc).join(','));
+      rows.push(['JV Cost', `${ml_.jv_cost_percent}%`, fmtN(ml_.jv_cost_amount)].map(esc).join(','));
+      rows.push(['Cost of Money', `${ml_.cost_of_money_percent}%`, fmtN(ml_.cost_of_money_amount)].map(esc).join(','));
+      rows.push(['Municipal Tax', `${ml_.municipal_tax_percent}%`, fmtN(ml_.municipal_tax_amount)].map(esc).join(','));
+      if (Number(ml_.others_1_percent) > 0) rows.push([ml_.others_1_label || 'Others 1', `${ml_.others_1_percent}%`, fmtN(ml_.others_1_amount)].map(esc).join(','));
+      if (Number(ml_.others_2_percent) > 0) rows.push([ml_.others_2_label || 'Others 2', `${ml_.others_2_percent}%`, fmtN(ml_.others_2_amount)].map(esc).join(','));
+      rows.push(['Gross Selling (VAT Ex)', '', fmtN(ml_.gross_selling_vat_ex)].map(esc).join(','));
+      rows.push([`VAT (${sheet.vat_rate}%)`, '', fmtN(ml_.vat_amount)].map(esc).join(','));
+      rows.push(['Net Selling (VAT Inc)', '', fmtN(ml_.net_selling_vat_inc)].map(esc).join(','));
+      rows.push('');
+
+      // Government Deductions
+      rows.push('Government Deductions');
+      rows.push(['Deduction', 'Rate', 'Amount'].map(esc).join(','));
+      rows.push(['Withholding Tax', `${ml_.withholding_tax_percent}%`, fmtN(ml_.withholding_tax_amount)].map(esc).join(','));
+      rows.push(['Creditable Tax', `${ml_.creditable_tax_percent}%`, fmtN(ml_.creditable_tax_amount)].map(esc).join(','));
+      rows.push(['Warranty Security', `${ml_.warranty_security_percent}%`, fmtN(ml_.warranty_security_amount)].map(esc).join(','));
+      rows.push(['Total Govt Deductions', '', fmtN(ml_.total_govt_deduction)].map(esc).join(','));
+      rows.push(['Net Amount Due', '', fmtN(ml_.net_amount_due)].map(esc).join(','));
+      rows.push('');
+
+      // Profitability
+      rows.push('Profitability Analysis');
+      rows.push(['Metric', 'Value'].map(esc).join(','));
+      rows.push(['Net Take Home', fmtN(ml_.net_take_home)].map(esc).join(','));
+      rows.push(['Earning Before VAT', fmtN(ml_.earning_before_vat)].map(esc).join(','));
+      rows.push(['Output VAT', fmtN(ml_.output_vat)].map(esc).join(','));
+      rows.push(['Input VAT', fmtN(ml_.input_vat)].map(esc).join(','));
+      rows.push(['VAT Payable', fmtN(ml_.vat_payable)].map(esc).join(','));
+      rows.push(['Earning After VAT', fmtN(ml_.earning_after_vat)].map(esc).join(','));
+      rows.push([`Commission (${ml_.commission_percent}%)`, fmtN(ml_.commission_amount)].map(esc).join(','));
+      rows.push(['Net Profit', fmtN(ml_.net_profit)].map(esc).join(','));
+      rows.push(['Actual Margin %', `${Number(ml_.actual_margin_percent || 0).toFixed(2)}%`].map(esc).join(','));
+      rows.push('');
+
+      // Commission Splits
+      if (ml_.commission_splits?.length > 0) {
+        rows.push('Commission Splits');
+        rows.push(['Role', 'Share %', 'Amount'].map(esc).join(','));
+        ml_.commission_splits.forEach((cs: any) => {
+          rows.push([cs.role_name, `${cs.percent}%`, fmtN(cs.amount)].map(esc).join(','));
+        });
+        rows.push(['Total', `${ml_.commission_splits.reduce((s: number, cs: any) => s + Number(cs.percent || 0), 0).toFixed(2)}%`, fmtN(ml_.commission_amount)].map(esc).join(','));
+        rows.push('');
+      }
+    });
+
+    // Download
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sheet.sheet_number || 'Costing'}_Report.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Costing sheet exported to CSV');
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-[#3BC25B] border-t-transparent rounded-full animate-spin" /></div>;
   if (!sheet) return null;
 
@@ -78,6 +191,7 @@ export default function CostingDetail() {
           <GreenButton variant="outline" onClick={() => navigate('/costing')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
           <GreenButton variant="outline" onClick={() => navigate(`/costing/${id}/edit`)}><Pencil className="w-4 h-4 mr-2" /> Edit</GreenButton>
           <GreenButton variant="outline" onClick={() => navigate(`/costing/${id}/scenarios`)}><FlaskConical className="w-4 h-4 mr-2" /> Scenarios</GreenButton>
+          <GreenButton onClick={exportCSV}><Download className="w-4 h-4 mr-2" /> Export CSV</GreenButton>
         </div>
       </div>
 

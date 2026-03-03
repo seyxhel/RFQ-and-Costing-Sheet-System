@@ -28,3 +28,21 @@ class ProductSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    @staticmethod
+    def _generate_sku():
+        """Auto-generate SKU in format PRD-00001."""
+        last = Product.objects.filter(sku__startswith="PRD-").order_by("-sku").first()
+        if last and last.sku.startswith("PRD-"):
+            try:
+                num = int(last.sku.split("-")[1]) + 1
+            except (ValueError, IndexError):
+                num = 1
+        else:
+            num = 1
+        return f"PRD-{num:05d}"
+
+    def create(self, validated_data):
+        if not validated_data.get("sku"):
+            validated_data["sku"] = self._generate_sku()
+        return super().create(validated_data)

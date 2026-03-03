@@ -26,8 +26,8 @@ class Product(models.Model):
     when creating RFQ line items or costing line items.
     """
     sku = models.CharField(
-        max_length=50, unique=True, blank=True, default="",
-        help_text="Stock Keeping Unit / internal code",
+        max_length=50, unique=True, blank=True,
+        help_text="Stock Keeping Unit / internal code — auto-generated if left empty",
     )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
