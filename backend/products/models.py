@@ -41,6 +41,19 @@ class Product(models.Model):
         max_digits=12, decimal_places=2, default=0,
         help_text="Estimated cost per unit (for RFQ stage estimation)",
     )
+
+    # Project-based links — a product is registered for a specific RFQ/supplier
+    rfq = models.ForeignKey(
+        "rfq.RFQ", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="products",
+        help_text="The RFQ this product is planned for",
+    )
+    supplier = models.ForeignKey(
+        "rfq.Supplier", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="products",
+        help_text="The supplier this product will be sourced from",
+    )
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

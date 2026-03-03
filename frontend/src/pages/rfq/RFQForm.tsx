@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
 import { rfqAPI } from '../../services/rfqService';
-import { supplierAPI } from '../../services/rfqService';
 import { productAPI } from '../../services/productService';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
@@ -13,21 +12,19 @@ export default function RFQForm() {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ title: '', description: '', deadline: '', suppliers: [] as number[] });
+  const [form, setForm] = useState({ title: '', description: '', deadline: '' });
   const [items, setItems] = useState<any[]>([{ product: '', item_name: '', quantity: 1, unit: 'pcs', specifications: '' }]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supplierAPI.list().then((r) => setSuppliers(r.data.results || r.data)).catch(() => {});
     productAPI.list().then((r) => setProducts(r.data.results || r.data)).catch(() => {});
     if (isEdit) {
       setLoading(true);
       rfqAPI.get(Number(id)).then((r) => {
         const d = r.data;
-        setForm({ title: d.title, description: d.description || '', deadline: d.deadline || '', suppliers: d.suppliers || [] });
+        setForm({ title: d.title, description: d.description || '', deadline: d.deadline || '' });
         if (d.items?.length) setItems(d.items.map((it: any) => ({ product: it.product || '', item_name: it.item_name || '', quantity: it.quantity || 1, unit: it.unit || 'pcs', specifications: it.specifications || '' })));
         setLoading(false);
       }).catch(() => { toast.error('Failed to load RFQ'); navigate('/rfq'); });
@@ -110,13 +107,7 @@ export default function RFQForm() {
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
               <textarea name="description" value={form.description} onChange={handleChange} rows={3} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none resize-none" />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Invited Suppliers</label>
-              <select multiple value={form.suppliers.map(String)} onChange={(e) => setForm((p) => ({ ...p, suppliers: Array.from(e.target.selectedOptions, (o) => Number(o.value)) }))} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none min-h-[80px]">
-                {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <p className="text-xs text-gray-400 mt-1">Hold Ctrl/Cmd to select multiple</p>
-            </div>
+
           </div>
         </Card>
 

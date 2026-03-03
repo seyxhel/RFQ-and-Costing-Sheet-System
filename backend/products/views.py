@@ -30,10 +30,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related("category").all()
+    queryset = Product.objects.select_related("category", "rfq", "supplier").all()
     serializer_class = ProductSerializer
     search_fields = ["name", "sku", "description", "specifications"]
-    filterset_fields = ["category", "is_active"]
+    filterset_fields = ["category", "is_active", "rfq", "supplier"]
 
     def perform_create(self, serializer):
         obj = serializer.save()

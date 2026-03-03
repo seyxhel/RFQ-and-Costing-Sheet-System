@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
 import { productAPI, categoryAPI } from '../../services/productService';
+import { rfqAPI, supplierAPI } from '../../services/rfqService';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 
@@ -14,13 +15,18 @@ export default function ProductForm() {
   const [form, setForm] = useState({
     name: '', description: '', category: '' as string | number, unit: 'pcs',
     specifications: '', estimated_unit_cost: '', is_active: true, sku: '',
+    rfq: '' as string | number, supplier: '' as string | number,
   });
   const [categories, setCategories] = useState<any[]>([]);
+  const [rfqs, setRfqs] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     categoryAPI.list().then((r) => setCategories(r.data.results || r.data)).catch(() => {});
+    rfqAPI.list().then((r) => setRfqs(r.data.results || r.data)).catch(() => {});
+    supplierAPI.list().then((r) => setSuppliers(r.data.results || r.data)).catch(() => {});
     if (isEdit) {
       setLoading(true);
       productAPI.get(Number(id)).then((r) => {
@@ -30,6 +36,7 @@ export default function ProductForm() {
           category: d.category || '', unit: d.unit || 'pcs',
           specifications: d.specifications || '', estimated_unit_cost: d.estimated_unit_cost || '',
           is_active: d.is_active ?? true, sku: d.sku || '',
+          rfq: d.rfq || '', supplier: d.supplier || '',
         });
         setLoading(false);
       }).catch(() => { toast.error('Failed to load product'); navigate('/products'); });
@@ -48,6 +55,8 @@ export default function ProductForm() {
       const payload = {
         ...form,
         category: form.category ? Number(form.category) : null,
+        rfq: form.rfq ? Number(form.rfq) : null,
+        supplier: form.supplier ? Number(form.supplier) : null,
         estimated_unit_cost: form.estimated_unit_cost || null,
         sku: form.sku || undefined,  // let backend auto-generate if empty
       };
@@ -103,6 +112,20 @@ export default function ProductForm() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Estimated Unit Cost (₱)</label>
               <input name="estimated_unit_cost" type="number" step="0.01" min="0" value={form.estimated_unit_cost} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Linked RFQ</label>
+              <select name="rfq" value={form.rfq} onChange={handleChange} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                <option value="">— No RFQ —</option>
+                {rfqs.map((r: any) => <option key={r.id} value={r.id}>{r.rfq_number} — {r.title}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Supplier</label>
+              <select name="supplier" value={form.supplier} onChange={handleChange} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                <option value="">— No Supplier —</option>
+                {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
