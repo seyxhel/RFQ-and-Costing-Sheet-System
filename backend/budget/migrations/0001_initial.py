@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sales', '0001_initial'),
         ('costing', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('rfq', '0001_initial'),
@@ -36,7 +35,6 @@ class Migration(migrations.Migration):
                 ('costing_sheet', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='budgets', to='costing.costingsheet')),
                 ('created_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='budgets_created', to=settings.AUTH_USER_MODEL)),
                 ('rfq', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='budgets', to='rfq.rfq')),
-                ('sales_order', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='budgets', to='sales.salesorder')),
             ],
             options={
                 'ordering': ['-created_at'],
