@@ -1,6 +1,6 @@
-# Business Internal System — RFQ & Costing Sheet
+# Business Internal System — RFQ, Costing & Sales
 
-A full-stack internal business system built with **React + TypeScript + Tailwind CSS** (frontend) and **Django + Django REST Framework** (backend). Designed for managing **Request for Quotations (RFQ)**, **Costing Sheets**, **Product Catalog**, **Budgets**, and **Procurement (Purchase Orders & Variance Monitoring)** with RBAC security, multi-level approvals, what-if scenario analysis, version history, and data export.
+A full-stack internal business system built with **React + TypeScript + Tailwind CSS** (frontend) and **Django + Django REST Framework** (backend). Covers the complete **Sales & Purchasing workflow**: Supplier canvassing, RFQ management, **PH-tax-aware costing sheets** with 3 margin levels, formal quotations, sales orders, contract analysis, budgets, and procurement variance monitoring — all with RBAC security, multi-level approvals, version history, and configurable cost/commission categories.
 
 ---
 
@@ -11,41 +11,45 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 3. [Project Structure](#project-structure)
 4. [Backend Setup (Django)](#backend-setup-django)
 5. [Frontend Setup (Vite + React)](#frontend-setup-vite--react)
-6. [Database: SQLite → PostgreSQL Migration](#database-sqlite--postgresql-migration)
-7. [API Endpoints Reference](#api-endpoints-reference)
-8. [Security Features](#security-features)
-9. [Module Details](#module-details)
-10. [Complete Workflow](#complete-workflow)
+6. [Default Credentials](#default-credentials)
+7. [Database: SQLite → PostgreSQL Migration](#database-sqlite--postgresql-migration)
+8. [API Endpoints Reference](#api-endpoints-reference)
+9. [Security Features](#security-features)
+10. [Module Details](#module-details)
+11. [PH-Tax-Aware Costing Formula](#ph-tax-aware-costing-formula)
+12. [Seeded Configuration Data](#seeded-configuration-data)
+13. [Complete Workflow](#complete-workflow)
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                React + TypeScript Frontend                       │
-│  Vite 5 · Tailwind CSS · Recharts · Lucide Icons · Sonner       │
-│  (Dashboard, RFQ, Costing, Products, Budget, Procurement,       │
-│   Variance Dashboard, Settings & Dark Mode)                     │
-│                    http://localhost:5173                         │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │  REST API (JSON + CSRF)
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Django Backend (DRF)                          │
-│   /api/v1/accounts/     — Authentication & User Management      │
-│   /api/v1/rfq/          — RFQ, Suppliers, Quotations            │
-│   /api/v1/costing/      — Costing Sheets, Scenarios, Exports    │
-│   /api/v1/products/     — Product Catalog & Categories          │
-│   /api/v1/budget/       — Budget Approval & Tracking            │
-│   /api/v1/procurement/  — Purchase Orders & Actual Costs        │
-│                    http://localhost:8000                         │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │  Django ORM
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│            SQLite (dev) / PostgreSQL (production)                │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                  React + TypeScript Frontend                         │
+│  Vite 5 · Tailwind CSS 3.4 · Recharts · Lucide Icons · Sonner      │
+│  (Dashboard, RFQ, Costing, Sales, Products, Budget, Procurement,    │
+│   Variance Monitor, Settings, Cost Categories & Commission CRUD)    │
+│                     http://localhost:3000                            │
+└──────────────────────────┬───────────────────────────────────────────┘
+                           │  REST API (JSON + CSRF)
+                           ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                     Django Backend (DRF)                              │
+│   /api/v1/accounts/     — Authentication & User Management           │
+│   /api/v1/products/     — Product Catalog & Categories               │
+│   /api/v1/rfq/          — RFQ, Suppliers, Quotations (Canvass)       │
+│   /api/v1/costing/      — Costing Sheets, Margins, Scenarios         │
+│   /api/v1/sales/        — Formal Quotations, Sales Orders, Contract  │
+│   /api/v1/budget/       — Budget Approval & Tracking                 │
+│   /api/v1/procurement/  — Purchase Orders & Actual Costs             │
+│                     http://localhost:8000                             │
+└──────────────────────────┬───────────────────────────────────────────┘
+                           │  Django ORM
+                           ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│             SQLite (dev) / PostgreSQL (production)                    │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -54,11 +58,11 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 
 | Layer        | Technology                                                        |
 |--------------|-------------------------------------------------------------------|
-| **Frontend** | Vite 5, React 18, TypeScript, Tailwind CSS 3.4, React Router v7  |
-| **UI/UX**    | Lucide React icons, Recharts (charts), Sonner (toast), Dark mode  |
+| **Frontend** | Vite 5, React 18, TypeScript 5.5, Tailwind CSS 3.4, React Router v7 |
+| **UI/UX**    | Lucide React 0.522, Recharts 2.12 (charts), Sonner 2.0 (toasts), Dark mode |
 | **Backend**  | Django 4.2, Django REST Framework, Session auth + CSRF            |
 | **Database** | SQLite (development), PostgreSQL-ready (production)               |
-| **Security** | AES-256 field encryption, PBKDF2 password hashing, RBAC          |
+| **Security** | AES-256 field encryption, PBKDF2 password hashing, 5-role RBAC   |
 | **Design**   | Green gradient theme (#63D44A → #0E8F79), collapsible sidebar     |
 
 ---
@@ -66,114 +70,72 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 ## Project Structure
 
 ```
-├── backend/                          # Django project root
-│   ├── manage.py                     # Django management commands
-│   ├── requirements.txt              # Python dependencies
-│   ├── .env.example                  # Environment variables template
-│   ├── core/                         # Django project settings
-│   │   ├── settings.py               # Main settings (DB, DRF, CORS, Security)
-│   │   ├── urls.py                   # Root URL routing
-│   │   └── wsgi.py                   # WSGI entry point
-│   ├── accounts/                     # User management & RBAC
-│   │   ├── models.py                 # Custom User model with roles
-│   │   ├── serializers.py            # User, ProfileUpdate, ChangePassword serializers
-│   │   ├── views.py                  # Login, logout, me, profile update, change password, user CRUD
-│   │   ├── permissions.py            # Custom DRF permission classes
-│   │   ├── encryption.py             # AES-256 field encryption utility
-│   │   └── urls.py                   # Account endpoints
-│   ├── rfq/                          # RFQ module
-│   │   ├── models.py                 # Supplier, RFQ, RFQItem, Quotation, ApprovalLog
-│   │   ├── serializers.py            # Nested serializers for RFQ & Quotation
-│   │   ├── views.py                  # CRUD + workflow (submit, approve, compare)
-│   │   └── urls.py                   # RFQ endpoints
-│   ├── costing/                      # Costing Sheet module
-│   │   ├── models.py                 # CostingSheet, LineItem, Version, Scenario
-│   │   ├── serializers.py            # Nested serializers with auto-generated sheet numbers
-│   │   ├── views.py                  # CRUD + recalculate, versioning, approve, export
-│   │   └── urls.py                   # Costing endpoints
-│   ├── products/                     # Product Catalog module
-│   │   ├── models.py                 # Category, Product
-│   │   ├── serializers.py            # Category & Product serializers
-│   │   ├── views.py                  # CRUD for categories and products
-│   │   └── urls.py                   # Product endpoints
-│   ├── budget/                       # Budget module
-│   │   ├── models.py                 # Budget with approval workflow
-│   │   ├── serializers.py            # Budget serializers
-│   │   ├── views.py                  # CRUD + submit, approve, reject, recalculate
-│   │   └── urls.py                   # Budget endpoints
-│   └── procurement/                  # Procurement module
-│       ├── models.py                 # PurchaseOrder, POLineItem, ActualCost
-│       ├── serializers.py            # PO & ActualCost serializers
-│       ├── views.py                  # CRUD + issue, complete, variance_summary
-│       └── urls.py                   # Procurement endpoints
+├── backend/                            # Django project root
+│   ├── manage.py                       # Django management commands
+│   ├── requirements.txt                # Python dependencies
+│   ├── core/                           # Django project settings
+│   │   ├── settings.py                 # DB, DRF, CORS, CSRF, Auth config
+│   │   ├── urls.py                     # Root URL routing (7 API modules)
+│   │   └── wsgi.py                     # WSGI entry point
+│   ├── accounts/                       # User management & RBAC
+│   │   ├── models.py                   # Custom User (5 roles), Attachment (GenericFK)
+│   │   ├── serializers.py              # User, Login, Profile, Password serializers
+│   │   ├── views.py                    # Login/logout/me, user CRUD
+│   │   ├── permissions.py              # IsAdminRole, CanApprove, etc.
+│   │   └── encryption.py              # AES-256 field encryption utility
+│   ├── products/                       # Product Catalog
+│   │   └── models.py                   # Category, Product (SKU, unit, specs)
+│   ├── rfq/                            # RFQ & Supplier Canvassing
+│   │   └── models.py                   # Supplier, RFQ, RFQItem, Quotation,
+│   │                                   #   QuotationItem (VAT calc, canvass fields),
+│   │                                   #   ApprovalLog
+│   ├── costing/                        # PH-Tax-Aware Costing Sheets
+│   │   └── models.py                   # CostCategory (CRUD), CommissionRole (CRUD),
+│   │                                   #   CostingSheet, CostingLineItem,
+│   │                                   #   CostingMarginLevel (LOW/MED/HIGH),
+│   │                                   #   CostingCommissionSplit,
+│   │                                   #   CostingVersion, Scenario
+│   ├── sales/                          # Sales Module (NEW)
+│   │   └── models.py                   # FormalQuotation, FormalQuotationItem,
+│   │                                   #   SalesOrder, ContractAnalysis
+│   ├── budget/                         # Budget Management
+│   │   └── models.py                   # Budget (linked to RFQ/Costing/SalesOrder)
+│   └── procurement/                    # Procurement & Variance
+│       └── models.py                   # PurchaseOrder, POLineItem, ActualCost
 │
-└── frontend/                         # Vite + React + TypeScript application
-    ├── package.json                  # Node dependencies
-    ├── index.html                    # HTML entry point (dark mode init script)
-    ├── vite.config.ts                # Vite config with API proxy
-    ├── tsconfig.json                 # TypeScript configuration
-    ├── tailwind.config.js            # Tailwind CSS configuration
-    ├── postcss.config.js             # PostCSS configuration
+└── frontend/                           # Vite + React + TypeScript
+    ├── package.json
+    ├── vite.config.ts                  # Port 3000, proxy /api → localhost:8000
     └── src/
-        ├── index.tsx                 # Entry point
-        ├── index.css                 # Tailwind directives + global styles
-        ├── App.tsx                   # Root component with routing
+        ├── App.tsx                     # 40+ routes
         ├── context/
-        │   ├── AuthContext.tsx        # Global auth state (login/logout/roles/refreshUser)
-        │   └── ThemeContext.tsx       # Dark mode (localStorage + OS preference)
+        │   ├── AuthContext.tsx          # Session auth state (login/logout/roles)
+        │   └── ThemeContext.tsx         # Dark mode (localStorage + OS preference)
         ├── services/
-        │   ├── api.ts                # Axios instance (CSRF cookie, interceptors)
-        │   ├── rfqService.ts         # RFQ, Supplier & Quotation API functions
-        │   ├── costingService.ts     # Costing Sheet, Scenario & Export API functions
-        │   ├── userService.ts        # User management API functions
-        │   ├── productService.ts     # Product & Category API functions
-        │   ├── budgetService.ts      # Budget API functions
-        │   └── procurementService.ts # Purchase Order & Actual Cost API functions
+        │   ├── api.ts                  # Axios instance (CSRF, interceptors)
+        │   ├── rfqService.ts           # RFQ, Supplier, Quotation APIs
+        │   ├── costingService.ts       # Costing, CostCategory, CommissionRole, Scenario
+        │   ├── salesService.ts         # Formal Quotations, Sales Orders, Contract Analysis
+        │   ├── productService.ts       # Products & Categories
+        │   ├── budgetService.ts        # Budget APIs
+        │   ├── procurementService.ts   # PO & Actual Cost APIs
+        │   └── userService.ts          # User management APIs
         ├── components/
-        │   ├── layout/
-        │   │   ├── Layout.tsx        # App shell (sidebar + topnav + content)
-        │   │   ├── Sidebar.tsx       # Collapsible navigation sidebar
-        │   │   └── TopNav.tsx        # Top navigation bar with user menu
-        │   └── ui/
-        │       ├── Card.tsx          # Reusable card component
-        │       ├── GreenButton.tsx   # Themed gradient button
-        │       ├── StatCard.tsx      # Dashboard statistic card
-        │       └── StatusBadge.tsx   # Color-coded status badge
+        │   ├── layout/                 # Layout, Sidebar (collapsible), TopNav
+        │   └── ui/                     # Card, GreenButton, StatCard, StatusBadge
         └── pages/
-            ├── Login.tsx             # Login form
-            ├── Dashboard.tsx         # Summary dashboard with stats
-            ├── Settings.tsx          # Profile settings, change password, dark mode toggle
-            ├── rfq/
-            │   ├── RFQList.tsx       # RFQ list with filters & status badges
-            │   ├── RFQForm.tsx       # Create/Edit RFQ + line items (product picker)
-            │   ├── RFQDetail.tsx     # RFQ detail + approval workflow
-            │   ├── SupplierList.tsx  # Supplier directory
-            │   ├── SupplierForm.tsx  # Create/Edit supplier
-            │   ├── QuotationList.tsx # All quotations with accept/reject actions
-            │   ├── QuotationForm.tsx # Create/Edit quotation (auto-populates from RFQ)
-            │   └── QuotationCompare.tsx # Side-by-side comparison + accept/reject
-            ├── costing/
-            │   ├── CostingList.tsx   # Costing sheet list
-            │   ├── CostingForm.tsx   # Create/Edit with categorized line items
-            │   ├── CostingDetail.tsx # Detail + pie chart + export + version history
-            │   ├── ScenarioList.tsx  # What-if scenario list with projections
-            │   └── ScenarioForm.tsx  # Create scenario with cost overrides
-            ├── products/
-            │   ├── ProductList.tsx   # Product catalog with search & category filter
-            │   ├── ProductForm.tsx   # Create/Edit product
-            │   └── CategoryList.tsx  # Product category management
-            ├── budget/
-            │   ├── BudgetList.tsx    # Budget list with status filters
-            │   ├── BudgetForm.tsx    # Create/Edit budget
-            │   └── BudgetDetail.tsx  # Budget detail + approval actions
-            ├── procurement/
-            │   ├── POList.tsx        # Purchase order list
-            │   ├── POForm.tsx        # Create/Edit purchase order
-            │   ├── PODetail.tsx      # PO detail + issue/complete actions
-            │   └── VarianceDashboard.tsx # Estimated vs actual cost monitoring
-            └── users/
-                ├── UserList.tsx      # User management list (Admin only)
-                └── UserForm.tsx      # Create/Edit user with role assignment
+            ├── Dashboard.tsx           # Summary stats with quick navigation
+            ├── Login.tsx               # Session-based login
+            ├── Settings.tsx            # Profile, password, dark mode,
+            │                           #   Cost Categories CRUD, Commission Roles CRUD
+            ├── rfq/                    # RFQ List/Form/Detail, Suppliers, Quotations, Compare
+            ├── costing/                # Costing List/Form/Detail (3 margins), Scenarios
+            ├── sales/                  # Formal Quotation List/Form/Detail,
+            │                           #   Sales Order List/Form/Detail, Contract Analysis
+            ├── products/               # Product List/Form, Category List
+            ├── budget/                 # Budget List/Form/Detail
+            ├── procurement/            # PO List/Form/Detail, Variance Dashboard
+            └── users/                  # User List/Form (Admin only)
 ```
 
 ---
@@ -197,19 +159,41 @@ venv\Scripts\activate          # Windows
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Copy and configure environment
-copy .env.example .env         # Windows
-# cp .env.example .env         # macOS/Linux
-# Edit .env with your settings
-
-# 4. Run migrations
-python manage.py makemigrations accounts rfq costing products budget procurement
+# 3. Run migrations
 python manage.py migrate
 
-# 5. Create superuser (ADMIN role)
-python manage.py createsuperuser
+# 4. Seed default data (cost categories, commission roles, admin user)
+python manage.py shell -c "
+from accounts.models import User
+from costing.models import CostCategory, CommissionRole
 
-# 6. Start development server
+# Create superuser
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@example.com', 'admin',
+        first_name='System', last_name='Admin', role='ADMIN')
+
+# Seed cost categories
+cats = [
+    ('Cost of Goods Sold', True),  ('Implementation Cost', False),
+    ('Labor Cost', False),         ('Representation / Meal', False),
+    ('Material Cost', False),      ('Transportation Cost', False),
+    ('Others / Miscellaneous', False),
+]
+for i, (name, vat) in enumerate(cats, 1):
+    CostCategory.objects.get_or_create(name=name, defaults={
+        'is_default': True, 'has_input_vat': vat, 'sort_order': i})
+
+# Seed commission roles
+roles = [('Sales', 50), ('President', 20), ('Vice President', 15),
+         ('Technical', 10), ('Admin', 5)]
+for i, (name, pct) in enumerate(roles, 1):
+    CommissionRole.objects.get_or_create(name=name, defaults={
+        'default_percent': pct, 'sort_order': i})
+
+print('Seed data created.')
+"
+
+# 5. Start development server
 python manage.py runserver
 ```
 
@@ -236,7 +220,7 @@ npm install
 npm run dev
 ```
 
-The React app will be available at `http://localhost:5173/`.
+The React app will be available at `http://localhost:3000/`.
 API calls are proxied to `http://localhost:8000` via `vite.config.ts`.
 
 ### Build for Production
@@ -248,9 +232,17 @@ npm run preview   # Preview production build
 
 ---
 
+## Default Credentials
+
+| Username | Password | Role  | Notes             |
+|----------|----------|-------|-------------------|
+| `admin`  | `admin`  | ADMIN | Superuser access  |
+
+---
+
 ## Database: SQLite → PostgreSQL Migration
 
-The ORM models are designed to be **database-agnostic**. To switch to PostgreSQL:
+The ORM models are **database-agnostic**. To switch to PostgreSQL:
 
 ### 1. Install PostgreSQL and create a database:
 ```sql
@@ -274,226 +266,351 @@ DB_PORT=5432
 python manage.py migrate
 ```
 
-**That's it!** No model changes needed. The Django ORM handles the translation.
+No model changes needed. The Django ORM handles the translation.
 
 ---
 
 ## API Endpoints Reference
 
 ### Accounts (`/api/v1/accounts/`)
-| Method | Endpoint              | Description                  | Auth Required |
-|--------|-----------------------|------------------------------|---------------|
-| POST   | `/login/`             | Login (session-based)        | No            |
-| POST   | `/logout/`            | Logout                       | Yes           |
-| GET    | `/me/`                | Current user profile         | Yes           |
-| PATCH  | `/profile/`           | Update own profile           | Yes           |
-| POST   | `/change-password/`   | Change own password          | Yes           |
-| GET    | `/users/`             | List all users               | Admin only    |
-| POST   | `/users/`             | Create user                  | Admin only    |
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/login/` | Session-based login | Public |
+| POST | `/logout/` | End session | Yes |
+| GET | `/me/` | Current user profile | Yes |
+| PUT/PATCH | `/profile/` | Update own profile | Yes |
+| POST | `/change-password/` | Change own password | Yes |
+| GET/POST | `/users/` | List / Create users | Admin |
+| GET/PUT/DELETE | `/users/{id}/` | User detail / update / delete | Admin |
 
 ### Products (`/api/v1/products/`)
-| Method | Endpoint                     | Description                        |
-|--------|------------------------------|------------------------------------|
-| GET    | `/categories/`               | List product categories            |
-| POST   | `/categories/`               | Create category                    |
-| GET/PUT/DELETE | `/categories/{id}/`    | Retrieve, update, or delete category |
-| GET    | `/products/`                 | List products (filterable)         |
-| POST   | `/products/`                 | Create product                     |
-| GET/PUT/DELETE | `/products/{id}/`      | Retrieve, update, or delete product |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/categories/` | List / Create product categories |
+| GET/PUT/DELETE | `/categories/{id}/` | Category CRUD |
+| GET/POST | `/products/` | List / Create products (filterable) |
+| GET/PUT/DELETE | `/products/{id}/` | Product CRUD |
 
 ### RFQ Module (`/api/v1/rfq/`)
-| Method | Endpoint                       | Description                          |
-|--------|--------------------------------|--------------------------------------|
-| GET    | `/suppliers/`                  | List suppliers                       |
-| POST   | `/suppliers/`                  | Create supplier                      |
-| GET/PUT/DELETE | `/suppliers/{id}/`       | Retrieve, update, or delete supplier |
-| GET    | `/rfqs/`                       | List RFQs (filterable by status)     |
-| POST   | `/rfqs/`                       | Create RFQ with line items           |
-| GET    | `/rfqs/{id}/`                  | RFQ detail with items                |
-| POST   | `/rfqs/{id}/submit/`           | Submit for approval                  |
-| POST   | `/rfqs/{id}/approve/`          | Approve (multi-level)                |
-| POST   | `/rfqs/{id}/reject/`           | Reject                               |
-| GET    | `/rfqs/{id}/compare/`          | Compare quotations (matrix view)     |
-| GET    | `/rfqs/{id}/approvals/`        | Approval audit trail                 |
-| GET    | `/quotations/`                 | List all quotations                  |
-| POST   | `/quotations/`                 | Submit quotation with items          |
-| POST   | `/quotations/{id}/accept/`     | Accept quotation                     |
-| POST   | `/quotations/{id}/reject/`     | Reject quotation                     |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/suppliers/` | List / Create suppliers |
+| GET/PUT/DELETE | `/suppliers/{id}/` | Supplier CRUD |
+| GET/POST | `/rfqs/` | List / Create RFQs with line items |
+| GET/PUT/DELETE | `/rfqs/{id}/` | RFQ CRUD |
+| POST | `/rfqs/{id}/submit/` | DRAFT → PENDING |
+| POST | `/rfqs/{id}/approve/` | Approve RFQ |
+| POST | `/rfqs/{id}/reject/` | Reject RFQ |
+| GET | `/rfqs/{id}/compare/` | Canvass comparison matrix |
+| GET/POST | `/quotations/` | List / Create quotations (canvass items) |
+| GET/PUT/DELETE | `/quotations/{id}/` | Quotation CRUD |
+| POST | `/quotations/{id}/accept/` | Accept quotation |
+| POST | `/quotations/{id}/reject/` | Reject quotation |
 
 ### Costing Module (`/api/v1/costing/`)
-| Method | Endpoint                           | Description                          |
-|--------|------------------------------------|--------------------------------------|
-| GET    | `/sheets/`                         | List costing sheets                  |
-| POST   | `/sheets/`                         | Create sheet with line items         |
-| GET    | `/sheets/{id}/`                    | Sheet detail with calculations       |
-| PUT    | `/sheets/{id}/`                    | Update sheet (status, line items)    |
-| POST   | `/sheets/{id}/recalculate/`        | Recalculate totals                   |
-| POST   | `/sheets/{id}/save_version/`       | Save version snapshot                |
-| GET    | `/sheets/{id}/versions/`           | Version history                      |
-| POST   | `/sheets/{id}/approve/`            | Approve sheet                        |
-| GET    | `/sheets/{id}/export_csv/`         | Download CSV report                  |
-| GET    | `/sheets/{id}/export_json/`        | Download JSON report                 |
-| GET    | `/line-items/`                     | List/create line items               |
-| GET    | `/scenarios/`                      | List what-if scenarios               |
-| POST   | `/scenarios/`                      | Create scenario                      |
-| POST   | `/scenarios/{id}/calculate/`       | Run scenario projection              |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/cost-categories/` | List / Create cost categories (CRUD-configurable) |
+| GET/PUT/DELETE | `/cost-categories/{id}/` | Cost category CRUD |
+| GET/POST | `/commission-roles/` | List / Create commission roles (CRUD-configurable) |
+| GET/PUT/DELETE | `/commission-roles/{id}/` | Commission role CRUD |
+| GET/POST | `/sheets/` | List / Create costing sheets |
+| GET/PUT/DELETE | `/sheets/{id}/` | Costing sheet CRUD |
+| POST | `/sheets/{id}/recalculate/` | Recalculate totals + all 3 margin levels |
+| POST | `/sheets/{id}/submit/` | DRAFT → IN_REVIEW |
+| POST | `/sheets/{id}/approve/` | IN_REVIEW → APPROVED |
+| POST | `/sheets/{id}/save_version/` | Save version snapshot (JSON) |
+| GET | `/sheets/{id}/versions/` | Version history list |
+| GET/PUT | `/sheets/{id}/margin/{LABEL}/` | Get / Update margin level (LOW, MEDIUM, HIGH) |
+| PUT | `/sheets/{id}/margin/{LABEL}/commission-splits/` | Bulk update commission splits |
+| GET/POST | `/line-items/` | List / Create line items |
+| GET/PUT/DELETE | `/line-items/{id}/` | Line item CRUD |
+| GET/POST | `/scenarios/` | List / Create what-if scenarios |
+| GET/PUT/DELETE | `/scenarios/{id}/` | Scenario CRUD |
+| POST | `/scenarios/{id}/calculate/` | Run scenario projection |
+
+### Sales Module (`/api/v1/sales/`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/quotations/` | List / Create formal quotations |
+| GET/PUT/DELETE | `/quotations/{id}/` | Formal quotation CRUD |
+| POST | `/quotations/{id}/send/` | DRAFT → SENT |
+| POST | `/quotations/{id}/accept/` | Accept formal quotation |
+| POST | `/quotations/{id}/reject/` | Reject formal quotation |
+| GET/POST | `/orders/` | List / Create sales orders |
+| GET/PUT/DELETE | `/orders/{id}/` | Sales order CRUD |
+| POST | `/orders/{id}/confirm/` | DRAFT → CONFIRMED |
+| POST | `/orders/{id}/start/` | → IN_PROGRESS |
+| POST | `/orders/{id}/complete/` | → COMPLETED |
+| GET/POST | `/contract-analyses/` | List / Create contract analyses |
+| GET/PUT/DELETE | `/contract-analyses/{id}/` | Contract analysis CRUD |
+| POST | `/contract-analyses/{id}/recalculate/` | Recalculate deductions & VAT |
 
 ### Budget Module (`/api/v1/budget/`)
-| Method | Endpoint                           | Description                          |
-|--------|------------------------------------|--------------------------------------|
-| GET    | `/budgets/`                        | List budgets                         |
-| POST   | `/budgets/`                        | Create budget                        |
-| GET    | `/budgets/{id}/`                   | Budget detail                        |
-| PUT    | `/budgets/{id}/`                   | Update budget                        |
-| DELETE | `/budgets/{id}/`                   | Delete budget                        |
-| POST   | `/budgets/{id}/submit/`            | Submit for approval                  |
-| POST   | `/budgets/{id}/approve/`           | Approve budget                       |
-| POST   | `/budgets/{id}/reject/`            | Reject budget                        |
-| POST   | `/budgets/{id}/recalculate/`       | Recalculate budget totals            |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/budgets/` | List / Create budgets |
+| GET/PUT/DELETE | `/budgets/{id}/` | Budget CRUD |
+| POST | `/budgets/{id}/approve/` | PENDING → APPROVED |
+| POST | `/budgets/{id}/recalculate/` | Recalculate from PO actuals |
 
 ### Procurement Module (`/api/v1/procurement/`)
-| Method | Endpoint                                  | Description                             |
-|--------|-------------------------------------------|-----------------------------------------|
-| GET    | `/purchase-orders/`                       | List purchase orders                    |
-| POST   | `/purchase-orders/`                       | Create purchase order                   |
-| GET    | `/purchase-orders/{id}/`                  | PO detail                               |
-| PUT    | `/purchase-orders/{id}/`                  | Update PO                               |
-| DELETE | `/purchase-orders/{id}/`                  | Delete PO                               |
-| POST   | `/purchase-orders/{id}/issue/`            | Issue PO                                |
-| POST   | `/purchase-orders/{id}/complete/`         | Complete PO (recalculates linked budget) |
-| GET    | `/purchase-orders/variance_summary/`      | Variance monitoring (estimated vs actual)|
-| GET    | `/actual-costs/`                          | List actual cost records                |
-| POST   | `/actual-costs/`                          | Record actual cost                      |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/purchase-orders/` | List / Create POs |
+| GET/PUT/DELETE | `/purchase-orders/{id}/` | PO CRUD |
+| POST | `/purchase-orders/{id}/issue/` | DRAFT → ISSUED |
+| POST | `/purchase-orders/{id}/complete/` | → COMPLETED (recalculates linked budget) |
+| GET/POST | `/actual-costs/` | List / Create actual cost records |
+| GET/PUT/DELETE | `/actual-costs/{id}/` | Actual cost CRUD |
 
 ---
 
 ## Security Features
 
-| Feature                  | Implementation                                              |
-|--------------------------|-------------------------------------------------------------|
-| **Authentication**       | Django session-based auth (CSRF protected)                  |
-| **Password hashing**     | PBKDF2 (Django default, 600K iterations)                    |
-| **RBAC**                 | 5 roles: Admin, Manager, Procurement, Finance, Viewer       |
-| **Field encryption**     | AES-256 via `cryptography` library (Fernet)                 |
-| **HTTPS/TLS**            | Auto-enabled when `DEBUG=False` (HSTS, secure cookies)      |
-| **CORS**                 | Restricted to allowed origins via `django-cors-headers`     |
-| **Permission classes**   | `IsAdminRole`, `CanApprove`, `CanEditFinancial`, `IsOwner`  |
+| Feature | Implementation |
+|---------|----------------|
+| **Authentication** | Django session-based auth with CSRF protection |
+| **Password hashing** | PBKDF2 (Django default, 600K iterations) |
+| **RBAC** | 5 roles: Admin, Manager, Procurement, Finance, Viewer |
+| **Field encryption** | AES-256 via `cryptography` library (Fernet) |
+| **HTTPS/TLS** | Auto-enabled when `DEBUG=False` (HSTS, secure cookies) |
+| **CORS** | Restricted to allowed origins via `django-cors-headers` |
+| **Permission classes** | `IsAdminRole`, `CanApprove`, `CanEditFinancial`, `IsOwner` |
+| **File uploads** | Local Django media storage (`MEDIA_ROOT`) |
 
 ### Role Permissions Matrix
 
-| Action                | Admin | Manager | Procurement | Finance | Viewer |
-|-----------------------|-------|---------|-------------|---------|--------|
-| Create RFQ            | ✅    | ✅      | ✅          | ❌      | ❌     |
-| Approve RFQ           | ✅    | ✅      | ❌          | ❌      | ❌     |
-| Accept quotation      | ✅    | ✅      | ❌          | ❌      | ❌     |
-| Edit financial data   | ✅    | ✅      | ❌          | ✅      | ❌     |
-| Approve costing sheet | ✅    | ✅      | ❌          | ❌      | ❌     |
-| Manage users          | ✅    | ❌      | ❌          | ❌      | ❌     |
-| View data             | ✅    | ✅      | ✅          | ✅      | ✅     |
+| Action | Admin | Manager | Procurement | Finance | Viewer |
+|--------|-------|---------|-------------|---------|--------|
+| Create RFQ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Approve RFQ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Accept quotation | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Edit financial data | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Approve costing sheet | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Manage cost categories | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Manage commission roles | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Manage users | ✅ | ❌ | ❌ | ❌ | ❌ |
+| View data | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
 ## Module Details
 
-### RFQ Module
-- **Create & manage RFQs** with item details, quantities, specifications, and product picker
-- **Supplier database** with profiles, contacts, and performance history (rating, on-time %)
-- **Track quotations** with deadlines and statuses (Pending → Accepted / Rejected)
-- **Side-by-side comparison** of quotations by price, delivery time, payment terms, and supplier rating
-- **Accept / Reject quotations** directly from the comparison matrix or list view
-- **Multi-level approval workflow** with audit trail
-- **Integration** with Costing Sheet (approved quotation prices feed into cost calculations)
+### RFQ & Supplier Canvassing Module
+- **Supplier database** with profiles, contacts, ratings, and on-time delivery performance
+- **Create RFQs** with project title, client name, item details, brand, model, and product references
+- **Supplier quotations (canvass matrix)** — per-line-item granularity with:
+  - Offer type (Same Item / Counter Offer) with brand & model
+  - VAT handling (VAT Inclusive / VAT Exclusive / VAT Exempt) with configurable rate per item
+  - Auto-computed VAT-exclusive price and VAT amount
+  - Availability (On Stock / Order Basis), warranty period, price validity
+  - Tax type, remarks, reference number, file upload for price proposals
+- **Side-by-side canvass comparison** across all suppliers per RFQ
+- **Multi-level approval workflow** with full audit trail (ApprovalLog)
+- **Status flow:** DRAFT → PENDING → SENT → RECEIVED → UNDER_REVIEW → APPROVED / REJECTED / CLOSED
 
-### Costing Sheet Module
-- **Detailed cost breakdown** by category — Material, Labor, Overhead, Logistics
-- **Auto-generated sheet numbers** (format: `CS-YYYYMM-NNNN`)
-- **Dynamic calculations** — total cost, selling price, and margin computed automatically
-- **Pie chart visualization** of cost distribution by category (Recharts)
-- **Version control** — save snapshots and browse full version history with expandable details
-- **Status workflow** — Draft → In Review → Approved → Archived
-- **Profit margin analysis** — target margin % → selling price calculation
-- **What-if scenarios** — override unit costs/quantities to project outcomes and compare against baseline
-- **Export** — download finalized sheets as CSV or JSON reports
+### Costing Sheet Module (PH-Tax-Aware)
+- **CRUD-configurable cost categories** — add/edit/delete categories via Settings (default: COGS, Implementation, Labor, Representation/Meal, Material, Transportation, Others)
+- **CRUD-configurable commission roles** — manage roles and default percentages (default: Sales 50%, President 20%, VP 15%, Technical 10%, Admin 5%)
+- **Auto-generated sheet numbers** (format: `QUO-YYYYMM-NNNN`)
+- **Categorized line items** — each linked to a cost category with optional `has_input_vat` flag
+- **Contingency** — configurable percentage applied on top of total cost
+- **3 margin levels (LOW / MEDIUM / HIGH)** — each with independently configurable:
+  - 7 addon percentages (facilitation, desired margin, JV cost, cost of money, municipal tax, 2× others)
+  - 3 government deduction rates (withholding tax, creditable tax, warranty security)
+  - Commission percentage with splits across roles
+- **25+ auto-computed fields per margin level** — selling price build-up, government deductions, profitability analysis, VAT passthrough, net profit, actual margin %
+- **Version control** — save JSON snapshots and browse full version history
+- **What-if scenarios** — override costs/quantities to project outcomes vs baseline
+- **Status workflow:** DRAFT → IN_REVIEW → APPROVED → ARCHIVED
+- **Pie chart visualization** of cost distribution by category
+- **Side-by-side margin comparison** table across LOW / MEDIUM / HIGH
+
+### Sales Module
+- **Formal Quotations** — client-facing quotes linked to RFQ, costing sheet, and selected margin level
+  - Auto-generated numbers (format: `FQ-YYYYMM-NNNN`)
+  - Line items with brand, model, quantity, unit price, auto-computed amounts
+  - VAT calculation (configurable rate, default 12%)
+  - Payment terms, delivery terms, validity, terms & conditions
+  - Status flow: DRAFT → SENT → ACCEPTED / REJECTED / REVISED
+- **Sales Orders** — awarded projects linked to formal quotations
+  - Auto-generated numbers (format: `SO-YYYYMM-NNNN`)
+  - Contract amount, VAT rate, awarded date
+  - Status flow: DRAFT → CONFIRMED → IN_PROGRESS → COMPLETED / CANCELLED
+- **Contract Analysis** — financial breakdown per sales order
+  - Contract price decomposition (VAT-exclusive amount, VAT amount)
+  - Deductions: warranty security, EWT (5%), LGU (2%), facilitation, COGS, implementation
+  - Net cash flow, net cash flow percentage, net benefit
+  - VAT passthrough: output VAT, input VAT, VAT payable
 
 ### Product Catalog Module
-- **Product categories** — Create and manage product categories
-- **Product CRUD** — Full product management with name, SKU, description, unit price, and category
-- **Product picker** — Integrated into RFQ item creation for standardized product references
-- **Search & filter** — Filter products by category, search by name
+- **Product categories** — create and manage product categories with active/inactive toggle
+- **Product CRUD** — name, SKU, description, unit, estimated unit cost, specifications, category
+- **Product picker** — integrated into RFQ item creation for standardized references
+- **Search & filter** — filter by category, search by name/SKU
 
 ### Budget Module
-- **Create budgets** with title, description, amount, and fiscal period
-- **Approval workflow** — Draft → Pending → Approved / Rejected
-- **Multi-level approval** — submit for review, manager/admin approve or reject
-- **Auto-recalculate** — recalculate budget totals based on linked purchase orders
-- **Budget tracking** — linked to purchase orders for actual spending visibility
+- **Create budgets** with title, description, allocated amount, and linked RFQ / costing sheet / sales order
+- **Auto-generated numbers** (format: `BUD-YYYYMM-NNNN`)
+- **Approval workflow:** DRAFT → PENDING → APPROVED / REJECTED / CLOSED
+- **Auto-recalculate** — recalculate spent/remaining amounts from linked PO actual costs
+- **Budget tracking** — linked to procurement for actual spend visibility
 
 ### Procurement Module
-- **Purchase Orders (PO)** — Create POs with line items, link to budgets and suppliers
-- **PO lifecycle** — Draft → Issued → Completed / Cancelled
-- **Actual cost recording** — Track actual costs per PO with cost type categories (Material, Labor, Overhead, Shipping, Other)
-- **Variance monitoring** — Real-time dashboard comparing estimated vs actual costs across all POs
-- **Budget integration** — Completing a PO auto-recalculates the linked budget
+- **Purchase Orders** — linked to supplier, RFQ, quotation, costing sheet, and budget
+  - Auto-generated numbers (format: `PO-YYYYMM-NNNN`)
+  - Line items with product reference, quantity, unit cost
+  - Estimated total vs actual total tracking
+- **PO lifecycle:** DRAFT → ISSUED → PARTIALLY_RECEIVED → COMPLETED / CANCELLED
+- **Actual cost recording** — per PO with cost type (Material, Labor, Overhead, Logistics, Other)
+- **Auto-recalculate** — completing a PO auto-recalculates the linked budget
+- **Variance monitoring** — dashboard comparing estimated vs actual costs
 
-### Settings & Preferences
-- **Profile management** — Users can update their own first name, last name, email, phone, and department
-- **Change password** — Self-service password change with current password verification (min 8 chars)
-- **Dark mode** — Toggle between light and dark themes; persists across page refreshes via localStorage; defaults to OS preference (`prefers-color-scheme`) on first visit
-- **Flash prevention** — Inline script in `index.html` sets the theme class before React mounts to prevent flash of wrong theme
-
-### User Management (Admin)
-- **Create and manage users** with role assignment
-- **5 built-in roles** — Admin, Manager, Procurement, Finance, Viewer
-- **Role-based access control** enforced at both API and UI levels
+### Settings & Administration
+- **Profile management** — update first name, last name, email, phone, department
+- **Change password** — self-service with current password verification
+- **Dark mode** — toggle between light/dark themes (persists via localStorage, defaults to OS preference)
+- **Cost Categories CRUD** — inline add/edit/delete with name, description, `has_input_vat` toggle, sort order
+- **Commission Roles CRUD** — inline add/edit/delete with name, default %, sort order, active toggle
 
 ### Dashboard
-- **At-a-glance summary** with stat cards for RFQs, quotations, and costing sheets
+- **Summary statistics** with stat cards for RFQs, quotations, costing sheets, and more
 - **Quick navigation** to all modules
+
+---
+
+## PH-Tax-Aware Costing Formula
+
+The costing engine implements Philippine-standard tax computations, verified against the QUO costing sheet template:
+
+```
+Given:
+  TPC = Total Project Cost (sum of line items + contingency)
+  sum_pct% = facilitation% + desired_margin% + JV_cost% + cost_of_money%
+             + municipal_tax% + others_1% + others_2%
+
+Selling Price Build-Up:
+  Gross Selling (VAT Ex) = TPC / (1 − sum_pct% / 100)
+  Each addon amount      = Gross Selling × addon% / 100
+  VAT Amount             = Gross Selling × VAT Rate / 100
+  Net Selling (VAT Inc)  = Gross Selling + VAT Amount
+
+Government Deductions:
+  Withholding Tax        = Gross Selling × withholding% / 100
+  Creditable Tax         = Gross Selling × creditable% / 100
+  Warranty Security      = Net Selling   × warranty_security% / 100
+  Net Amount Due         = Net Selling − Total Government Deductions
+
+Profitability:
+  Municipal Tax Revenue  = Net Selling × municipal_tax% / 100
+  Net Take Home          = Net Amount Due − Facilitation − Municipal Tax Revenue
+  Earning Before VAT     = Net Take Home − TPC
+
+VAT Passthrough:
+  Output VAT             = VAT Amount
+  Input VAT              = Input VAT Base × VAT Rate / (1 + VAT Rate)
+  VAT Payable            = Output VAT − Input VAT − Creditable Tax
+  Earning After VAT      = Earning Before VAT − VAT Payable
+
+Commission & Net Profit:
+  Commission             = Earning Before VAT × commission% / 100
+  Net Profit             = Earning After VAT − Commission − JV Cost Amount
+  Actual Margin %        = Net Profit / Net Selling × 100
+```
+
+> **Note:** Input VAT Base = sum of line items whose cost category has `has_input_vat = true` (typically COGS).
+
+---
+
+## Seeded Configuration Data
+
+### Cost Categories (7 defaults)
+
+| # | Category | Has Input VAT |
+|---|----------|---------------|
+| 1 | Cost of Goods Sold | ✅ |
+| 2 | Implementation Cost | ❌ |
+| 3 | Labor Cost | ❌ |
+| 4 | Representation / Meal | ❌ |
+| 5 | Material Cost | ❌ |
+| 6 | Transportation Cost | ❌ |
+| 7 | Others / Miscellaneous | ❌ |
+
+### Commission Roles (5 defaults, sum = 100%)
+
+| # | Role | Default % |
+|---|------|-----------|
+| 1 | Sales | 50% |
+| 2 | President | 20% |
+| 3 | Vice President | 15% |
+| 4 | Technical | 10% |
+| 5 | Admin | 5% |
+
+### Default Margin Levels (auto-created per sheet)
+
+| Level | Default Desired Margin |
+|-------|----------------------|
+| LOW | 20% |
+| MEDIUM | 40% |
+| HIGH | 50% |
+
+All categories, roles, and margin parameters are **fully editable** via the Settings page or API.
 
 ---
 
 ## Complete Workflow
 
-The system supports the following end-to-end business workflow:
+The system supports the complete Sales & Purchasing business workflow:
 
 ```
-1.  Create Products         → Build product catalog with categories & SKUs
+ 1. Setup Configuration    → Configure cost categories, commission roles, products
             ↓
-2.  Create Suppliers        → Add vendor profiles with contact info & ratings
+ 2. Create Suppliers       → Add vendor profiles with contacts & performance ratings
             ↓
-3.  Create RFQ              → Define items needed (pick products, quantities & specs)
+ 3. Create RFQ             → Define items needed (product, brand, model, qty, specs)
             ↓
-4.  Submit RFQ              → Push for multi-level approval
+ 4. Submit & Approve RFQ   → Multi-level approval with audit trail
             ↓
-5.  Collect Quotations      → Enter supplier quotes with pricing & delivery terms
+ 5. Collect Quotations     → Enter supplier canvass data per item:
+                              offer type, VAT handling, availability,
+                              warranty, price proposals (file upload)
             ↓
-6.  Compare & Accept        → Side-by-side matrix comparison → accept best quote
+ 6. Compare & Accept       → Side-by-side canvass matrix → accept best quote
             ↓
-7.  Create Budget           → Define budget with fiscal period & amount
+ 7. Create Costing Sheet   → Categorized line items (from canvass or manual),
+                              contingency %, 3 margin levels auto-generated
             ↓
-8.  Submit & Approve Budget → Manager/Admin reviews and approves budget
+ 8. Tune Margin Levels     → Adjust facilitation, desired margin, JV cost,
+                              cost of money, municipal tax, commission %,
+                              govt deduction rates per level (LOW/MED/HIGH)
             ↓
-9.  Create Purchase Order   → Link to budget & supplier, add line items
+ 9. Review & Approve       → Submit for review → Manager/Admin approves
             ↓
-10. Issue PO                → Send PO to supplier
+10. Save Version           → Snapshot costing sheet state for audit trail
             ↓
-11. Record Actual Costs     → Track real costs as they come in
+11. Create Formal Quote    → Client-facing quotation linked to selected margin level
             ↓
-12. Complete PO             → Mark as complete, auto-recalculate budget
+12. Send & Negotiate       → DRAFT → SENT → ACCEPTED/REJECTED/REVISED
             ↓
-13. Create Costing Sheet    → Break down costs (materials, labor, overhead, logistics)
+13. Create Sales Order     → Awarded project with contract amount
             ↓
-14. What-If Scenarios       → Model cost variations (±% or fixed overrides)
+14. Contract Analysis      → Financial breakdown: deductions, net cash flow,
+                              VAT passthrough, net benefit
             ↓
-15. Save Snapshot           → Lock a version of the costing sheet for records
+15. Create Budget          → Allocated amount linked to sales order
             ↓
-16. Submit for Review       → Change status from Draft → In Review
+16. Approve Budget         → Manager/Admin reviews and approves
             ↓
-17. Approve                 → Manager/Admin approves the costing sheet
+17. Create Purchase Order  → Link to budget, supplier, add line items
             ↓
-18. Monitor Variance        → Dashboard comparing estimated vs actual costs
+18. Issue PO               → Send to supplier
             ↓
-19. Export                  → Download CSV or JSON for finance/PO creation
+19. Record Actual Costs    → Track real costs as invoices arrive
+            ↓
+20. Complete PO            → Auto-recalculate budget spent/remaining
+            ↓
+21. Monitor Variance       → Dashboard comparing estimated vs actual costs
 ```
 
 ---
