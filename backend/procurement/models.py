@@ -105,6 +105,8 @@ class ActualCost(models.Model):
         LABOR = "LABOR", "Labor"
         OVERHEAD = "OVERHEAD", "Overhead"
         LOGISTICS = "LOGISTICS", "Logistics"
+        SHIPPING = "SHIPPING", "Shipping"
+        TAX = "TAX", "Tax"
         OTHER = "OTHER", "Other"
 
     purchase_order = models.ForeignKey(

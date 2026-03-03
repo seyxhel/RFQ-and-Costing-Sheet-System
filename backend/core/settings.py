@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "products",                 # Product/Item catalog
     "rfq",                      # Request for Quotation module
     "costing",                  # Costing Sheet module
+    "sales",                    # Formal Quotation, Sales Order, Contract Analysis
     "budget",                   # Budget allocation & approval
     "procurement",              # Purchase Orders & actual cost tracking
 ]
@@ -169,21 +170,17 @@ REST_FRAMEWORK = {
 # --------------------------------------------------------------------------
 # CORS (allow React dev server)
 # --------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = [
-    o.strip().rstrip("/") for o in env_config(
-        "CORS_ALLOWED_ORIGINS",
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",") if o.strip()
-]
+CORS_ALLOWED_ORIGINS = env_config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF trusted origins — must include the frontend dev server + Railway domains
-CSRF_TRUSTED_ORIGINS = [
-    o.strip().rstrip("/") for o in env_config(
-        "CSRF_TRUSTED_ORIGINS",
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",") if o.strip()
-]
+# CSRF trusted origins — must include the frontend dev server
+CSRF_TRUSTED_ORIGINS = env_config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+).split(",")
 
 # --------------------------------------------------------------------------
 # Internationalization
@@ -198,6 +195,10 @@ USE_TZ = True
 # --------------------------------------------------------------------------
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media files (user uploads: price proposals, attachments)
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # --------------------------------------------------------------------------
 # Field-level encryption key (AES-256 via cryptography library)

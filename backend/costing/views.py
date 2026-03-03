@@ -1,56 +1,85 @@
 # ============================================================================
-# costing/views.py — API views for the Costing Sheet module
-# ============================================================================
-# ViewSets for CostingSheet, Scenario, plus custom actions for
-# version control, recalculation, and export.
+# costing/views.py — Costing module API views
 # ============================================================================
 
-import csv
-import json
-from io import StringIO
-
-from django.http import HttpResponse
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Q
 
-from accounts.permissions import CanApprove, CanEditFinancial
-
-from .models import CostingSheet, CostingLineItem, CostingVersion, Scenario
+from accounts.models import AuditLog, log_action
+from .models import (
+    CostCategory, CommissionRole,
+    CostingSheet, CostingLineItem,
+    CostingMarginLevel, CostingCommissionSplit,
+    CostingVersion, Scenario,
+)
 from .serializers import (
-    CostingSheetListSerializer,
-    CostingSheetDetailSerializer,
-    CostingLineItemSerializer,
-    CostingVersionSerializer,
-    ScenarioSerializer,
-    CostingReportSerializer,
+    CostCategorySerializer, CommissionRoleSerializer,
+    CostingSheetListSerializer, CostingSheetDetailSerializer,
+    CostingLineItemSerializer, CostingMarginLevelSerializer,
+    CostingCommissionSplitSerializer,
+    CostingVersionSerializer, ScenarioSerializer,
 )
 
 
-class CostingSheetViewSet(viewsets.ModelViewSet):
-    """
-    CRUD + workflow actions for Costing Sheets.
-
-    Endpoints:
-        GET    /api/v1/costing/sheets/                      — List all sheets
-        POST   /api/v1/costing/sheets/                      — Create sheet
-        GET    /api/v1/costing/sheets/{id}/                  — Sheet detail
-        PUT    /api/v1/costing/sheets/{id}/                  — Update sheet
-        DELETE /api/v1/costing/sheets/{id}/                  — Delete sheet
-
-    Custom actions:
-        POST   /api/v1/costing/sheets/{id}/recalculate/     — Recalculate totals
-        POST   /api/v1/costing/sheets/{id}/save_version/    — Save version snapshot
-        GET    /api/v1/costing/sheets/{id}/versions/        — Version history
-        POST   /api/v1/costing/sheets/{id}/approve/         — Approve sheet
-        GET    /api/v1/costing/sheets/{id}/export_csv/      — Export as CSV
-        GET    /api/v1/costing/sheets/{id}/export_json/     — Export as JSON
-    """
-    queryset = CostingSheet.objects.prefetch_related("line_items", "versions", "scenarios")
+class CostCategoryViewSet(viewsets.ModelViewSet):
+    queryset = CostCategory.objects.all()
+    serializer_class = CostCategorySerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["status", "rfq", "created_by"]
-    search_fields = ["sheet_number", "title"]
-    ordering_fields = ["created_at", "updated_at", "total_cost"]
+    search_fields = ["name"]
+    filterset_fields = ["is_active"]
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.CREATE, object_type="CostCategory",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.UPDATE, object_type="CostCategory",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.DELETE, object_type="CostCategory",
+                   object_id=instance.id, object_repr=instance.name)
+        instance.delete()
+
+
+class CommissionRoleViewSet(viewsets.ModelViewSet):
+    queryset = CommissionRole.objects.all()
+    serializer_class = CommissionRoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    search_fields = ["name"]
+    filterset_fields = ["is_active"]
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.CREATE, object_type="CommissionRole",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.UPDATE, object_type="CommissionRole",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.DELETE, object_type="CommissionRole",
+                   object_id=instance.id, object_repr=instance.name)
+        instance.delete()
+
+
+class CostingSheetViewSet(viewsets.ModelViewSet):
+    queryset = CostingSheet.objects.select_related(
+        "rfq", "created_by", "approved_by",
+    ).prefetch_related("line_items", "margin_levels")
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -58,162 +87,171 @@ class CostingSheetViewSet(viewsets.ModelViewSet):
         return CostingSheetDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        obj = serializer.save(created_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.CREATE, object_type="CostingSheet",
+                   object_id=obj.id, object_repr=obj.sheet_number,
+                   new_status=obj.status)
 
-    # ----- Recalculate totals from line items -----
+    def get_queryset(self):
+        qs = super().get_queryset()
+        s = self.request.query_params.get("status")
+        if s:
+            qs = qs.filter(status=s)
+        q = self.request.query_params.get("search")
+        if q:
+            qs = qs.filter(
+                Q(sheet_number__icontains=q)
+                | Q(title__icontains=q)
+                | Q(project_title__icontains=q)
+                | Q(client_name__icontains=q)
+            )
+        return qs
+
+    # ----- Recalculate -----
     @action(detail=True, methods=["post"])
     def recalculate(self, request, pk=None):
-        """Recalculate all totals and selling price from line items."""
+        """Recalculate all totals, margin levels, and profitability."""
         sheet = self.get_object()
-        sheet.recalculate_totals()
+        sheet.recalculate()
+        sheet.refresh_from_db()
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.RECALCULATE, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number)
         return Response(CostingSheetDetailSerializer(sheet).data)
 
-    # ----- Version control -----
+    # ----- Workflow -----
     @action(detail=True, methods=["post"])
-    def save_version(self, request, pk=None):
-        """
-        Save a snapshot of the current costing sheet state.
-        Body: { "change_summary": "Updated material prices" }
-        """
+    def submit(self, request, pk=None):
         sheet = self.get_object()
+        if sheet.status != CostingSheet.Status.DRAFT:
+            return Response(
+                {"detail": "Only DRAFT sheets can be submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        sheet.status = CostingSheet.Status.IN_REVIEW
+        sheet.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.SUBMIT, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number,
+                   old_status="DRAFT", new_status="IN_REVIEW")
+        return Response(CostingSheetDetailSerializer(sheet).data)
 
-        # Build snapshot
-        snapshot = CostingSheetDetailSerializer(sheet).data
-
-        version = CostingVersion.objects.create(
-            costing_sheet=sheet,
-            version_number=sheet.version,
-            snapshot_data=snapshot,
-            change_summary=request.data.get("change_summary", ""),
-            created_by=request.user,
-        )
-
-        # Increment version on the sheet
-        sheet.version += 1
-        sheet.save()
-
-        return Response(CostingVersionSerializer(version).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=["get"])
-    def versions(self, request, pk=None):
-        """List all historical versions of this costing sheet."""
-        sheet = self.get_object()
-        versions = sheet.versions.all()
-        return Response(CostingVersionSerializer(versions, many=True).data)
-
-    # ----- Approval -----
-    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated, CanApprove])
+    @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
-        """Approve a costing sheet."""
         sheet = self.get_object()
         if sheet.status != CostingSheet.Status.IN_REVIEW:
             return Response(
-                {"detail": "Sheet must be IN_REVIEW to approve."},
+                {"detail": "Only IN_REVIEW sheets can be approved."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         sheet.status = CostingSheet.Status.APPROVED
         sheet.approved_by = request.user
-        sheet.save()
+        sheet.save(update_fields=["status", "approved_by"])
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.APPROVE, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number,
+                   old_status="IN_REVIEW", new_status="APPROVED")
         return Response(CostingSheetDetailSerializer(sheet).data)
 
-    # ----- Export: CSV -----
-    @action(detail=True, methods=["get"])
-    def export_csv(self, request, pk=None):
-        """Export costing sheet as a CSV file."""
-        sheet = self.get_object()
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = f'attachment; filename="{sheet.sheet_number}.csv"'
-
-        writer = csv.writer(response)
-        # Header
-        writer.writerow([
-            "Cost Type", "Description", "Quantity", "Unit",
-            "Unit Cost", "Material", "Labor", "Overhead",
-            "Logistics", "Total",
-        ])
-        # Line items
-        for item in sheet.line_items.all():
-            writer.writerow([
-                item.cost_type, item.description, item.quantity, item.unit,
-                item.unit_cost, item.material_cost, item.labor_cost,
-                item.overhead_cost, item.logistics_cost, item.total_cost,
-            ])
-        # Summary row
-        writer.writerow([])
-        writer.writerow(["TOTALS", "", "", "", "",
-                         sheet.total_material_cost, sheet.total_labor_cost,
-                         sheet.total_overhead_cost, sheet.total_logistics_cost,
-                         sheet.total_cost])
-        writer.writerow(["Selling Price", sheet.selling_price])
-        writer.writerow(["Margin %", sheet.actual_margin_percent])
-
-        return response
-
-    # ----- Export: JSON -----
-    @action(detail=True, methods=["get"])
-    def export_json(self, request, pk=None):
-        """Export costing sheet as a JSON report."""
+    # ----- Version Snapshot -----
+    @action(detail=True, methods=["post"])
+    def save_version(self, request, pk=None):
+        """Snapshot current state into a version record."""
         sheet = self.get_object()
         data = CostingSheetDetailSerializer(sheet).data
-        response = HttpResponse(
-            json.dumps(data, indent=2, default=str),
-            content_type="application/json",
+        ver_num = sheet.versions.count() + 1
+        version = CostingVersion.objects.create(
+            costing_sheet=sheet,
+            version_number=ver_num,
+            snapshot_data=data,
+            change_summary=request.data.get("change_summary", ""),
+            created_by=request.user,
         )
-        response["Content-Disposition"] = f'attachment; filename="{sheet.sheet_number}.json"'
-        return response
+        sheet.version = ver_num
+        sheet.save(update_fields=["version"])
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.SAVE_VERSION, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number,
+                   details={"version": ver_num, "summary": request.data.get("change_summary", "")})
+        return Response(CostingVersionSerializer(version).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def versions(self, request, pk=None):
+        sheet = self.get_object()
+        versions = sheet.versions.all()
+        return Response(CostingVersionSerializer(versions, many=True).data)
+
+    # ----- Margin CRUD -----
+    @action(detail=True, methods=["get", "put"], url_path="margin/(?P<label>[A-Z]+)")
+    def margin(self, request, pk=None, label=None):
+        """Get or update a specific margin level."""
+        sheet = self.get_object()
+        try:
+            ml = sheet.margin_levels.get(label=label)
+        except CostingMarginLevel.DoesNotExist:
+            return Response({"detail": "Margin level not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == "GET":
+            return Response(CostingMarginLevelSerializer(ml).data)
+
+        # PUT
+        from .serializers import CostingMarginLevelWriteSerializer
+        ser = CostingMarginLevelWriteSerializer(ml, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        sheet.recalculate()
+        ml.refresh_from_db()
+        return Response(CostingMarginLevelSerializer(ml).data)
+
+    # ----- Commission Splits -----
+    @action(detail=True, methods=["put"], url_path="margin/(?P<label>[A-Z]+)/commission-splits")
+    def update_commission_splits(self, request, pk=None, label=None):
+        """Bulk update commission splits for a margin level."""
+        sheet = self.get_object()
+        try:
+            ml = sheet.margin_levels.get(label=label)
+        except CostingMarginLevel.DoesNotExist:
+            return Response({"detail": "Margin level not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        splits_data = request.data.get("splits", [])
+        for split_data in splits_data:
+            role_id = split_data.get("role")
+            percent = split_data.get("percent", 0)
+            cs, _ = CostingCommissionSplit.objects.get_or_create(
+                margin_level=ml, role_id=role_id,
+            )
+            cs.percent = percent
+            cs.save()
+        sheet.recalculate()
+        ml.refresh_from_db()
+        return Response(CostingMarginLevelSerializer(ml).data)
 
 
-# --------------------------------------------------------------------------
-# Costing Line Item (standalone CRUD for fine-grained editing)
-# --------------------------------------------------------------------------
 class CostingLineItemViewSet(viewsets.ModelViewSet):
-    """
-    CRUD for individual costing line items.
-    Typically used for adding/editing items within an existing costing sheet.
-    After modification, call /sheets/{id}/recalculate/ to update totals.
-
-    Endpoints:
-        GET    /api/v1/costing/line-items/
-        POST   /api/v1/costing/line-items/
-        GET    /api/v1/costing/line-items/{id}/
-        PUT    /api/v1/costing/line-items/{id}/
-        DELETE /api/v1/costing/line-items/{id}/
-    """
-    queryset = CostingLineItem.objects.select_related("costing_sheet", "supplier")
+    queryset = CostingLineItem.objects.select_related("category", "supplier")
     serializer_class = CostingLineItemSerializer
-    permission_classes = [permissions.IsAuthenticated, CanEditFinancial]
-    filterset_fields = ["costing_sheet", "cost_type", "supplier"]
-    ordering_fields = ["cost_type", "total_cost"]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        sheet_id = self.request.query_params.get("costing_sheet")
+        if sheet_id:
+            qs = qs.filter(costing_sheet_id=sheet_id)
+        return qs
 
 
-# --------------------------------------------------------------------------
-# Scenario (What-If Analysis)
-# --------------------------------------------------------------------------
 class ScenarioViewSet(viewsets.ModelViewSet):
-    """
-    CRUD + calculate for what-if scenarios.
-
-    Endpoints:
-        GET    /api/v1/costing/scenarios/
-        POST   /api/v1/costing/scenarios/
-        GET    /api/v1/costing/scenarios/{id}/
-        PUT    /api/v1/costing/scenarios/{id}/
-        DELETE /api/v1/costing/scenarios/{id}/
-
-    Custom actions:
-        POST   /api/v1/costing/scenarios/{id}/calculate/   — Run projection
-    """
-    queryset = Scenario.objects.select_related("costing_sheet")
+    queryset = Scenario.objects.select_related("costing_sheet", "created_by")
     serializer_class = ScenarioSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["costing_sheet"]
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        scenario = serializer.save(created_by=self.request.user)
+        scenario.calculate()
 
     @action(detail=True, methods=["post"])
     def calculate(self, request, pk=None):
-        """Apply overrides and calculate projected totals."""
         scenario = self.get_object()
         scenario.calculate()
         return Response(ScenarioSerializer(scenario).data)

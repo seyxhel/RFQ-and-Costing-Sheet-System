@@ -40,7 +40,7 @@ export default function RFQDetail() {
         <div className="flex gap-3">
           <GreenButton variant="outline" onClick={() => navigate('/rfq')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
           <GreenButton variant="outline" onClick={() => navigate(`/rfq/${id}/edit`)}><span>Edit</span></GreenButton>
-          <GreenButton variant="outline" onClick={() => navigate(`/rfq/${id}/compare`)}><BarChart3 className="w-4 h-4 mr-2" /> Compare Quotes</GreenButton>
+          <GreenButton variant="outline" onClick={() => navigate(`/rfq/${id}/compare`)}><BarChart3 className="w-4 h-4 mr-2" /> Compare Canvass</GreenButton>
         </div>
       </div>
 

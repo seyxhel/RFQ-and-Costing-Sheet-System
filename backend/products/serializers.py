@@ -1,3 +1,7 @@
+# ============================================================================
+# products/serializers.py — Product catalog serializers
+# ============================================================================
+
 from rest_framework import serializers
 from .models import Category, Product
 
@@ -17,17 +21,28 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            "id", "sku", "name", "description", "category", "category_name",
-            "unit", "specifications", "estimated_unit_cost",
-            "is_active", "created_at", "updated_at",
+            "id", "sku", "name", "description",
+            "category", "category_name",
+            "unit", "specifications",
+            "estimated_unit_cost", "is_active",
+            "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    @staticmethod
+    def _generate_sku():
+        """Auto-generate SKU in format PRD-00001."""
+        last = Product.objects.filter(sku__startswith="PRD-").order_by("-sku").first()
+        if last and last.sku.startswith("PRD-"):
+            try:
+                num = int(last.sku.split("-")[1]) + 1
+            except (ValueError, IndexError):
+                num = 1
+        else:
+            num = 1
+        return f"PRD-{num:05d}"
+
     def create(self, validated_data):
-        # Auto-generate SKU if not provided
         if not validated_data.get("sku"):
-            import datetime
-            prefix = "PRD"
-            count = Product.objects.count() + 1
-            validated_data["sku"] = f"{prefix}-{count:05d}"
+            validated_data["sku"] = self._generate_sku()
         return super().create(validated_data)

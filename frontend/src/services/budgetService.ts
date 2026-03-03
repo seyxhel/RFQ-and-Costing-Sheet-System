@@ -11,5 +11,6 @@ export const budgetAPI = {
   submit:      (id: number)         => api.post(`${B}/budgets/${id}/submit/`),
   approve:     (id: number)         => api.post(`${B}/budgets/${id}/approve/`),
   reject:      (id: number, d: any) => api.post(`${B}/budgets/${id}/reject/`, d),
+  close:       (id: number)         => api.post(`${B}/budgets/${id}/close/`),
   recalculate: (id: number)         => api.post(`${B}/budgets/${id}/recalculate/`),
 };

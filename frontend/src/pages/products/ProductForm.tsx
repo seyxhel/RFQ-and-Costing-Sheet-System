@@ -13,7 +13,7 @@ export default function ProductForm() {
 
   const [form, setForm] = useState({
     name: '', description: '', category: '' as string | number, unit: 'pcs',
-    specifications: '', estimated_unit_cost: '', is_active: true,
+    specifications: '', estimated_unit_cost: '', is_active: true, sku: '',
   });
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +29,7 @@ export default function ProductForm() {
           name: d.name || '', description: d.description || '',
           category: d.category || '', unit: d.unit || 'pcs',
           specifications: d.specifications || '', estimated_unit_cost: d.estimated_unit_cost || '',
-          is_active: d.is_active ?? true,
+          is_active: d.is_active ?? true, sku: d.sku || '',
         });
         setLoading(false);
       }).catch(() => { toast.error('Failed to load product'); navigate('/products'); });
@@ -49,6 +49,7 @@ export default function ProductForm() {
         ...form,
         category: form.category ? Number(form.category) : null,
         estimated_unit_cost: form.estimated_unit_cost || null,
+        sku: form.sku || undefined,  // let backend auto-generate if empty
       };
       if (isEdit) {
         await productAPI.update(Number(id), payload);
@@ -83,6 +84,10 @@ export default function ProductForm() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Product Name <span className="text-red-500">*</span></label>
               <input name="name" value={form.name} onChange={handleChange} required className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">SKU</label>
+              <input name="sku" value={form.sku} onChange={handleChange} placeholder="Auto-generated if left empty" className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Category</label>
