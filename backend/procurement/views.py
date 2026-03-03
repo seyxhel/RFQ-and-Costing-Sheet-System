@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 
+from accounts.models import AuditLog, log_action
 from .models import PurchaseOrder, ActualCost
 from .serializers import (
     PurchaseOrderListSerializer, PurchaseOrderDetailSerializer,
@@ -26,7 +27,11 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         return PurchaseOrderDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        obj = serializer.save(created_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.PROCUREMENT,
+                   action=AuditLog.ActionType.CREATE, object_type="PurchaseOrder",
+                   object_id=obj.id, object_repr=obj.po_number,
+                   new_status=obj.status)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -50,13 +55,22 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             )
         po.status = PurchaseOrder.Status.ISSUED
         po.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.PROCUREMENT,
+                   action=AuditLog.ActionType.ISSUE, object_type="PurchaseOrder",
+                   object_id=po.id, object_repr=po.po_number,
+                   old_status="DRAFT", new_status="ISSUED")
         return Response(PurchaseOrderDetailSerializer(po).data)
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         po = self.get_object()
+        old = po.status
         po.status = PurchaseOrder.Status.COMPLETED
         po.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.PROCUREMENT,
+                   action=AuditLog.ActionType.COMPLETE, object_type="PurchaseOrder",
+                   object_id=po.id, object_repr=po.po_number,
+                   old_status=old, new_status="COMPLETED")
         return Response(PurchaseOrderDetailSerializer(po).data)
 
 
@@ -66,7 +80,22 @@ class ActualCostViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(recorded_by=self.request.user)
+        obj = serializer.save(recorded_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.PROCUREMENT,
+                   action=AuditLog.ActionType.CREATE, object_type="ActualCost",
+                   object_id=obj.id,
+                   object_repr=f"{obj.cost_type}: {obj.description[:60]}",
+                   details={"purchase_order_id": obj.purchase_order_id,
+                            "amount": str(obj.amount), "reference": obj.reference_number})
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.PROCUREMENT,
+                   action=AuditLog.ActionType.DELETE, object_type="ActualCost",
+                   object_id=instance.id,
+                   object_repr=f"{instance.cost_type}: {instance.description[:60]}",
+                   details={"purchase_order_id": instance.purchase_order_id,
+                            "amount": str(instance.amount)})
+        instance.delete()
 
     def get_queryset(self):
         qs = super().get_queryset()

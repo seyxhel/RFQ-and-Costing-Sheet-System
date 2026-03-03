@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 
+from accounts.models import AuditLog, log_action
 from .models import (
     CostCategory, CommissionRole,
     CostingSheet, CostingLineItem,
@@ -29,6 +30,24 @@ class CostCategoryViewSet(viewsets.ModelViewSet):
     search_fields = ["name"]
     filterset_fields = ["is_active"]
 
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.CREATE, object_type="CostCategory",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.UPDATE, object_type="CostCategory",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.DELETE, object_type="CostCategory",
+                   object_id=instance.id, object_repr=instance.name)
+        instance.delete()
+
 
 class CommissionRoleViewSet(viewsets.ModelViewSet):
     queryset = CommissionRole.objects.all()
@@ -36,6 +55,24 @@ class CommissionRoleViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     search_fields = ["name"]
     filterset_fields = ["is_active"]
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.CREATE, object_type="CommissionRole",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.UPDATE, object_type="CommissionRole",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.SETTINGS,
+                   action=AuditLog.ActionType.DELETE, object_type="CommissionRole",
+                   object_id=instance.id, object_repr=instance.name)
+        instance.delete()
 
 
 class CostingSheetViewSet(viewsets.ModelViewSet):
@@ -50,7 +87,11 @@ class CostingSheetViewSet(viewsets.ModelViewSet):
         return CostingSheetDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        obj = serializer.save(created_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.CREATE, object_type="CostingSheet",
+                   object_id=obj.id, object_repr=obj.sheet_number,
+                   new_status=obj.status)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -74,6 +115,9 @@ class CostingSheetViewSet(viewsets.ModelViewSet):
         sheet = self.get_object()
         sheet.recalculate()
         sheet.refresh_from_db()
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.RECALCULATE, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number)
         return Response(CostingSheetDetailSerializer(sheet).data)
 
     # ----- Workflow -----
@@ -87,6 +131,10 @@ class CostingSheetViewSet(viewsets.ModelViewSet):
             )
         sheet.status = CostingSheet.Status.IN_REVIEW
         sheet.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.SUBMIT, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number,
+                   old_status="DRAFT", new_status="IN_REVIEW")
         return Response(CostingSheetDetailSerializer(sheet).data)
 
     @action(detail=True, methods=["post"])
@@ -100,6 +148,10 @@ class CostingSheetViewSet(viewsets.ModelViewSet):
         sheet.status = CostingSheet.Status.APPROVED
         sheet.approved_by = request.user
         sheet.save(update_fields=["status", "approved_by"])
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.APPROVE, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number,
+                   old_status="IN_REVIEW", new_status="APPROVED")
         return Response(CostingSheetDetailSerializer(sheet).data)
 
     # ----- Version Snapshot -----
@@ -118,6 +170,10 @@ class CostingSheetViewSet(viewsets.ModelViewSet):
         )
         sheet.version = ver_num
         sheet.save(update_fields=["version"])
+        log_action(request=request, module=AuditLog.Module.COSTING,
+                   action=AuditLog.ActionType.SAVE_VERSION, object_type="CostingSheet",
+                   object_id=sheet.id, object_repr=sheet.sheet_number,
+                   details={"version": ver_num, "summary": request.data.get("change_summary", "")})
         return Response(CostingVersionSerializer(version).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get"])

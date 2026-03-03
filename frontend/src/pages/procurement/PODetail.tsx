@@ -165,6 +165,8 @@ export default function PODetail() {
               <select value={costForm.cost_type} onChange={(e) => setCostForm((p) => ({ ...p, cost_type: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
                 <option value="MATERIAL">Material</option>
                 <option value="LABOR">Labor</option>
+                <option value="OVERHEAD">Overhead</option>
+                <option value="LOGISTICS">Logistics</option>
                 <option value="SHIPPING">Shipping</option>
                 <option value="TAX">Tax</option>
                 <option value="OTHER">Other</option>

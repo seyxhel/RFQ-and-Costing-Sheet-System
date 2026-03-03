@@ -104,3 +104,28 @@ class AttachmentSerializer(serializers.ModelSerializer):
             "uploaded_by", "uploaded_by_name", "uploaded_at",
         ]
         read_only_fields = ["id", "filename", "file_size", "uploaded_by", "uploaded_at"]
+
+
+# --------------------------------------------------------------------------
+# Audit Log
+# --------------------------------------------------------------------------
+class AuditLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    module_display = serializers.CharField(source="get_module_display", read_only=True)
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
+
+    class Meta:
+        from .models import AuditLog
+        model = AuditLog
+        fields = [
+            "id", "module", "module_display", "action", "action_display",
+            "object_type", "object_id", "object_repr",
+            "old_status", "new_status", "details",
+            "user", "user_name", "ip_address", "timestamp",
+        ]
+        read_only_fields = fields
+
+    def get_user_name(self, obj):
+        if obj.user:
+            return obj.user.get_full_name() or obj.user.username
+        return "System"

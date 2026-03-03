@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 
+from accounts.models import AuditLog, log_action
 from .models import FormalQuotation, SalesOrder, ContractAnalysis
 from .serializers import (
     FormalQuotationListSerializer, FormalQuotationDetailSerializer,
@@ -27,7 +28,11 @@ class FormalQuotationViewSet(viewsets.ModelViewSet):
         return FormalQuotationDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        obj = serializer.save(created_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.CREATE, object_type="FormalQuotation",
+                   object_id=obj.id, object_repr=obj.quotation_number,
+                   new_status=obj.status)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -54,20 +59,34 @@ class FormalQuotationViewSet(viewsets.ModelViewSet):
             )
         fq.status = FormalQuotation.Status.SENT
         fq.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.SEND, object_type="FormalQuotation",
+                   object_id=fq.id, object_repr=fq.quotation_number,
+                   old_status="DRAFT", new_status="SENT")
         return Response(FormalQuotationDetailSerializer(fq).data)
 
     @action(detail=True, methods=["post"])
     def accept(self, request, pk=None):
         fq = self.get_object()
+        old = fq.status
         fq.status = FormalQuotation.Status.ACCEPTED
         fq.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.ACCEPT, object_type="FormalQuotation",
+                   object_id=fq.id, object_repr=fq.quotation_number,
+                   old_status=old, new_status="ACCEPTED")
         return Response(FormalQuotationDetailSerializer(fq).data)
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
         fq = self.get_object()
+        old = fq.status
         fq.status = FormalQuotation.Status.REJECTED
         fq.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.REJECT, object_type="FormalQuotation",
+                   object_id=fq.id, object_repr=fq.quotation_number,
+                   old_status=old, new_status="REJECTED")
         return Response(FormalQuotationDetailSerializer(fq).data)
 
 
@@ -83,7 +102,11 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         return SalesOrderDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        obj = serializer.save(created_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.CREATE, object_type="SalesOrder",
+                   object_id=obj.id, object_repr=obj.so_number,
+                   new_status=obj.status)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -109,20 +132,34 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             )
         so.status = SalesOrder.Status.CONFIRMED
         so.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.STATUS_CHANGE, object_type="SalesOrder",
+                   object_id=so.id, object_repr=so.so_number,
+                   old_status="DRAFT", new_status="CONFIRMED")
         return Response(SalesOrderDetailSerializer(so).data)
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         so = self.get_object()
+        old = so.status
         so.status = SalesOrder.Status.IN_PROGRESS
         so.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.STATUS_CHANGE, object_type="SalesOrder",
+                   object_id=so.id, object_repr=so.so_number,
+                   old_status=old, new_status="IN_PROGRESS")
         return Response(SalesOrderDetailSerializer(so).data)
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         so = self.get_object()
+        old = so.status
         so.status = SalesOrder.Status.COMPLETED
         so.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.COMPLETE, object_type="SalesOrder",
+                   object_id=so.id, object_repr=so.so_number,
+                   old_status=old, new_status="COMPLETED")
         return Response(SalesOrderDetailSerializer(so).data)
 
 
@@ -143,4 +180,7 @@ class ContractAnalysisViewSet(viewsets.ModelViewSet):
         analysis = self.get_object()
         analysis.recalculate()
         analysis.refresh_from_db()
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.RECALCULATE, object_type="ContractAnalysis",
+                   object_id=analysis.id, object_repr=f"CA-{analysis.id}")
         return Response(ContractAnalysisSerializer(analysis).data)

@@ -17,6 +17,8 @@ import {
   Send,
   Award,
   FilePieChart,
+  ClipboardCheck,
+  FileBarChart,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -57,6 +59,8 @@ export function Sidebar({ currentPath, onNavigate, onExpandChange }: SidebarProp
     { id: 'budgets', label: 'Budgets', icon: Wallet, path: '/budgets', section: 'Budget & Procurement' },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders' },
     { id: 'variance', label: 'Variance Monitor', icon: BarChart3, path: '/variance' },
+    { id: 'audit-log', label: 'Audit Log', icon: ClipboardCheck, path: '/audit-log', section: 'Reports' },
+    { id: 'project-report', label: 'Project Report', icon: FileBarChart, path: '/reports/project' },
     ...(isAdmin() ? [
       { id: 'users', label: 'Manage Users', icon: Users, path: '/users', section: 'Admin' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },

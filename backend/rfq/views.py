@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 
+from accounts.models import AuditLog, log_action
 from .models import Supplier, RFQ, Quotation, QuotationItem, ApprovalLog
 from .serializers import (
     SupplierSerializer,
@@ -23,6 +24,24 @@ class SupplierViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "contact_person", "email"]
     filterset_fields = ["is_active"]
 
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.CREATE, object_type="Supplier",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.UPDATE, object_type="Supplier",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.DELETE, object_type="Supplier",
+                   object_id=instance.id, object_repr=instance.name)
+        instance.delete()
+
 
 class RFQViewSet(viewsets.ModelViewSet):
     queryset = RFQ.objects.select_related("created_by", "approved_by").prefetch_related(
@@ -36,7 +55,11 @@ class RFQViewSet(viewsets.ModelViewSet):
         return RFQDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        obj = serializer.save(created_by=self.request.user)
+        log_action(request=self.request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.CREATE, object_type="RFQ",
+                   object_id=obj.id, object_repr=obj.rfq_number,
+                   new_status=obj.status)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -66,6 +89,10 @@ class RFQViewSet(viewsets.ModelViewSet):
             )
         rfq.status = RFQ.Status.PENDING
         rfq.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.SUBMIT, object_type="RFQ",
+                   object_id=rfq.id, object_repr=rfq.rfq_number,
+                   old_status="DRAFT", new_status="PENDING")
         return Response(RFQDetailSerializer(rfq).data)
 
     @action(detail=True, methods=["post"])
@@ -85,6 +112,10 @@ class RFQViewSet(viewsets.ModelViewSet):
             action=ApprovalLog.Action.APPROVED,
             comments=request.data.get("comments", ""),
         )
+        log_action(request=request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.APPROVE, object_type="RFQ",
+                   object_id=rfq.id, object_repr=rfq.rfq_number,
+                   old_status="PENDING", new_status="APPROVED")
         return Response(RFQDetailSerializer(rfq).data)
 
     @action(detail=True, methods=["post"])
@@ -97,6 +128,10 @@ class RFQViewSet(viewsets.ModelViewSet):
             action=ApprovalLog.Action.REJECTED,
             comments=request.data.get("comments", ""),
         )
+        log_action(request=request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.REJECT, object_type="RFQ",
+                   object_id=rfq.id, object_repr=rfq.rfq_number,
+                   new_status="REJECTED")
         return Response(RFQDetailSerializer(rfq).data)
 
     @action(detail=True, methods=["get"])
@@ -202,6 +237,11 @@ class QuotationViewSet(viewsets.ModelViewSet):
             rfq=quotation.rfq,
             status=Quotation.Status.PENDING,
         ).exclude(pk=quotation.pk).update(status=Quotation.Status.REJECTED)
+        log_action(request=request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.ACCEPT, object_type="Quotation",
+                   object_id=quotation.id, object_repr=quotation.quotation_number,
+                   new_status="ACCEPTED",
+                   details={"supplier": quotation.supplier.name if quotation.supplier else ""})
         return Response(QuotationDetailSerializer(quotation).data)
 
     @action(detail=True, methods=["post"])
@@ -209,4 +249,8 @@ class QuotationViewSet(viewsets.ModelViewSet):
         quotation = self.get_object()
         quotation.status = Quotation.Status.REJECTED
         quotation.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.REJECT, object_type="Quotation",
+                   object_id=quotation.id, object_repr=quotation.quotation_number,
+                   new_status="REJECTED")
         return Response(QuotationDetailSerializer(quotation).data)

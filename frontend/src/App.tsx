@@ -56,6 +56,10 @@ import UserForm from './pages/users/UserForm';
 // Settings
 import Settings from './pages/Settings';
 
+// Reports & Audit
+import AuditLog from './pages/AuditLog';
+import ProjectReport from './pages/ProjectReport';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
@@ -154,6 +158,10 @@ function AppRoutes() {
                 <Route path="/users" element={<AdminRoute><UserList /></AdminRoute>} />
                 <Route path="/users/new" element={<AdminRoute><UserForm /></AdminRoute>} />
                 <Route path="/users/:id/edit" element={<AdminRoute><UserForm /></AdminRoute>} />
+
+                {/* Reports & Audit */}
+                <Route path="/audit-log" element={<AuditLog />} />
+                <Route path="/reports/project" element={<ProjectReport />} />
 
                 {/* Settings */}
                 <Route path="/settings" element={<Settings />} />

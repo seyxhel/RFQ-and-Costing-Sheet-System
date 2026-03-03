@@ -27,6 +27,7 @@ export default function BudgetDetail() {
       if (action === 'submit') await budgetAPI.submit(Number(id));
       else if (action === 'approve') await budgetAPI.approve(Number(id));
       else if (action === 'reject') await budgetAPI.reject(Number(id), { rejection_reason: prompt('Rejection reason:') || '' });
+      else if (action === 'close') await budgetAPI.close(Number(id));
       else if (action === 'recalculate') await budgetAPI.recalculate(Number(id));
       toast.success(`Budget ${action}d successfully`);
       load();
@@ -64,7 +65,10 @@ export default function BudgetDetail() {
             </>
           )}
           {budget.status === 'APPROVED' && (
-            <GreenButton variant="outline" onClick={() => doAction('recalculate')} disabled={acting}><RefreshCw className="w-4 h-4 mr-2" /> Recalculate Spent</GreenButton>
+            <>
+              <GreenButton onClick={() => doAction('close')} disabled={acting}><CheckCircle className="w-4 h-4 mr-2" /> Close Budget</GreenButton>
+              <GreenButton variant="outline" onClick={() => doAction('recalculate')} disabled={acting}><RefreshCw className="w-4 h-4 mr-2" /> Recalculate Spent</GreenButton>
+            </>
           )}
           <GreenButton variant="outline" onClick={() => navigate(`/budgets/${id}/edit`)}>Edit</GreenButton>
           <GreenButton variant="outline" onClick={() => navigate('/budgets')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
