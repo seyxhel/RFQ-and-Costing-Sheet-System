@@ -1,0 +1,30 @@
+,,Form / Report / Printable ,With Uploading of Documents 
+,Assigned To,,
+RFQ Stage ,Sales ,Create Request for Quote ,"Define the following brand, model, description, quantity and Unit of Measurement"
+,Purchasing ,Submit RFQ to Purchasing ,
+,Purchasing ,Canvass and Collect Quotation by Purchasing from Supplier ,
+,Purchasing ,Create Matrix Comparison (3 Vendor) ,"Define the following 
+
+SUPPLIER NAME 
+OFFER
+BRAND
+MODEL
+DESCRIPTION 
+QUANTITY
+UOM
+UNIT PRICE 
+AMOUNT 
+AVAILABILITY
+(ON-STOCK OR ORDER BASIS)
+WARRANTY
+(1YR, 6MOS, 3YRS, 5YRS)
+PRICE VALIDITY
+(FROM SUPPLIER PROPOSAL)
+REMARKS
+REFERENCE
+PRICE PROPOSAL"
+,Sales,Create Costing Sheet ,
+Quotation,Sales,Create Formal Quotation ,
+Budget ,,Sales Order - Awarded Project ,
+Actual Cost Tracking ,,MAMD,
+Variance Monitoring ,,,
