@@ -8,6 +8,8 @@
 # ============================================================================
 
 from django.contrib.auth.models import AbstractUser
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 
@@ -58,3 +60,42 @@ class User(AbstractUser):
     def can_edit_financial(self):
         """Finance officers, managers, and admins can edit financial data."""
         return self.role in (self.Role.ADMIN, self.Role.MANAGER, self.Role.FINANCE)
+
+
+class Attachment(models.Model):
+    """Generic file attachment for any module."""
+
+    file = models.FileField(upload_to="attachments/%Y/%m/")
+    filename = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField(default=0, help_text="Bytes")
+    description = models.CharField(max_length=500, blank=True, default="")
+
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+    )
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    uploaded_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True,
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
+
+    def __str__(self):
+        return self.filename
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.filename:
+            self.filename = self.file.name.split("/")[-1]
+        if self.file and not self.file_size:
+            try:
+                self.file_size = self.file.size
+            except (OSError, AttributeError):
+                pass
+        super().save(*args, **kwargs)

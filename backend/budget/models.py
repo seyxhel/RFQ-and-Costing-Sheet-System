@@ -45,6 +45,10 @@ class Budget(models.Model):
         "costing.CostingSheet", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="budgets",
     )
+    sales_order = models.ForeignKey(
+        "sales.SalesOrder", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="budgets",
+    )
 
     # Ownership
     created_by = models.ForeignKey(

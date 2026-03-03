@@ -1,29 +1,66 @@
 # ============================================================================
-# costing/models.py — Costing Sheet module data models
+# costing/models.py — Costing Sheet with PH-tax-aware 3-margin financial model
 # ============================================================================
-# Models:
-#   CostingSheet        — Header with version control & profit analysis
-#   CostingLineItem     — Detailed cost breakdown rows
-#   CostingVersion      — Historical snapshots (version control)
-#   Scenario            — "What-if" analysis records
-#
-# Integration points:
-#   - Links to rfq.Quotation for dynamic supplier-based calculations
-#   - Links to rfq.Supplier for material sourcing
-#   - Encrypted fields for sensitive financial data
-# ============================================================================
+
+import datetime
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.db import models
-from django.utils import timezone
+
+TWO = Decimal("0.01")
+D = Decimal
 
 
+def _r(val):
+    """Round to 2 decimal places."""
+    return val.quantize(TWO, rounding=ROUND_HALF_UP)
+
+
+# --------------------------------------------------------------------------
+# Cost Category (CRUD-configurable)
+# --------------------------------------------------------------------------
+class CostCategory(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, default="")
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    has_input_vat = models.BooleanField(
+        default=False,
+        help_text="If checked, this category contributes to Input VAT computation",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name_plural = "cost categories"
+
+    def __str__(self):
+        return self.name
+
+
+# --------------------------------------------------------------------------
+# Commission Role (CRUD-configurable)
+# --------------------------------------------------------------------------
+class CommissionRole(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    default_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.default_percent}%)"
+
+
+# --------------------------------------------------------------------------
+# Costing Sheet
+# --------------------------------------------------------------------------
 class CostingSheet(models.Model):
-    """
-    Costing Sheet header — aggregates cost breakdown, calculates margins.
-    Integration: Pulls unit prices from accepted RFQ quotations.
-    """
-
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         IN_REVIEW = "IN_REVIEW", "In Review"
@@ -31,46 +68,34 @@ class CostingSheet(models.Model):
         ARCHIVED = "ARCHIVED", "Archived"
 
     # Reference
-    sheet_number = models.CharField(
-        max_length=50, unique=True,
-        help_text="Auto-generated or user-defined costing sheet reference",
-    )
+    sheet_number = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.DRAFT,
-    )
-    version = models.PositiveIntegerField(
-        default=1, help_text="Current version number (auto-incremented on save)",
-    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    version = models.PositiveIntegerField(default=1)
 
-    # ----- Cost aggregates (calculated from line items) -----
-    total_material_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    total_labor_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    total_overhead_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    total_logistics_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    # Project info (from QUO template header)
+    project_title = models.CharField(max_length=255, blank=True, default="")
+    client_name = models.CharField(max_length=255, blank=True, default="")
+    date = models.DateField(default=datetime.date.today)
+    warranty = models.CharField(max_length=255, blank=True, default="")
+
+    # ---- Cost aggregates ----
     total_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
-    # ----- Profit margin analysis -----
-    target_margin_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, default=20.00,
-        help_text="Desired profit margin percentage",
-    )
-    selling_price = models.DecimalField(
-        max_digits=14, decimal_places=2, default=0,
-        help_text="Calculated: total_cost / (1 - margin%)",
-    )
-    actual_margin_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0,
-    )
+    # Contingency
+    contingency_percent = models.DecimalField(max_digits=5, decimal_places=2, default=5.00)
+    contingency_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_project_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
+    # VAT rate for all margin-level computations
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=2, default=12.00)
     currency = models.CharField(max_length=10, default="PHP")
 
-    # Integration: link to the RFQ whose quotation feeds material costs
+    # Integration
     rfq = models.ForeignKey(
-        "rfq.RFQ", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="costing_sheets",
-        help_text="Source RFQ for supplier pricing data",
+        "rfq.RFQ", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="costing_sheets",
     )
 
     # Ownership
@@ -91,128 +116,245 @@ class CostingSheet(models.Model):
     def __str__(self):
         return f"{self.sheet_number} v{self.version} — {self.title}"
 
-    # ----- Dynamic calculation helpers -----
+    # ---- Input VAT base: sum of line items whose category has_input_vat ----
+    def _get_input_vat_base(self):
+        return self.line_items.filter(
+            category__has_input_vat=True
+        ).aggregate(t=models.Sum("total_cost"))["t"] or D("0")
 
-    def recalculate_totals(self):
-        """
-        Re-aggregate cost totals from line items and compute selling price.
-        Called after line items are added/edited.
-        """
+    def recalculate(self):
+        """Recalculate totals from line items, contingency, and all margin levels."""
         from django.db.models import Sum
 
-        aggregates = self.line_items.aggregate(
-            materials=Sum("material_cost"),
-            labor=Sum("labor_cost"),
-            overhead=Sum("overhead_cost"),
-            logistics=Sum("logistics_cost"),
-        )
-        self.total_material_cost = aggregates["materials"] or 0
-        self.total_labor_cost = aggregates["labor"] or 0
-        self.total_overhead_cost = aggregates["overhead"] or 0
-        self.total_logistics_cost = aggregates["logistics"] or 0
-        self.total_cost = (
-            self.total_material_cost
-            + self.total_labor_cost
-            + self.total_overhead_cost
-            + self.total_logistics_cost
-        )
-        # Selling price = total_cost / (1 - margin%)
-        if self.target_margin_percent < 100:
-            self.selling_price = self.total_cost / (1 - self.target_margin_percent / 100)
-        else:
-            self.selling_price = self.total_cost
-
-        # Actual margin
-        if self.selling_price > 0:
-            self.actual_margin_percent = (
-                (self.selling_price - self.total_cost) / self.selling_price * 100
-            )
+        total = self.line_items.aggregate(t=Sum("total_cost"))["t"] or D("0")
+        self.total_cost = _r(total)
+        cp = D(str(self.contingency_percent))
+        self.contingency_amount = _r(self.total_cost * cp / D("100"))
+        self.total_project_cost = _r(self.total_cost + self.contingency_amount)
         self.save()
 
+        ivb = self._get_input_vat_base()
+        for ml in self.margin_levels.all():
+            ml.recalculate(self.total_project_cost, self.vat_rate, ivb)
 
+
+# --------------------------------------------------------------------------
+# Costing Line Item
+# --------------------------------------------------------------------------
 class CostingLineItem(models.Model):
-    """
-    Individual cost breakdown row — materials, labor, overhead, logistics.
-    Integration: material_cost can be auto-populated from QuotationItem.unit_price.
-    """
-
-    class CostType(models.TextChoices):
-        MATERIAL = "MATERIAL", "Material"
-        LABOR = "LABOR", "Labor"
-        OVERHEAD = "OVERHEAD", "Overhead"
-        LOGISTICS = "LOGISTICS", "Logistics"
-        OTHER = "OTHER", "Other"
-
-    costing_sheet = models.ForeignKey(
-        CostingSheet, on_delete=models.CASCADE, related_name="line_items",
-    )
-    cost_type = models.CharField(
-        max_length=20, choices=CostType.choices, default=CostType.MATERIAL,
-    )
-    description = models.CharField(max_length=500)
-    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=1)
-    unit = models.CharField(max_length=30, default="pcs")
-    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
-    # Breakdown buckets (filled based on cost_type or manually)
-    material_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    labor_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    overhead_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    logistics_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    costing_sheet = models.ForeignKey(CostingSheet, on_delete=models.CASCADE, related_name="line_items")
+    category = models.ForeignKey(CostCategory, on_delete=models.PROTECT, related_name="line_items")
+    description = models.CharField(max_length=500, blank=True, default="")
+    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
-    # Integration: link to supplier quotation item for dynamic pricing
     quotation_item = models.ForeignKey(
         "rfq.QuotationItem", on_delete=models.SET_NULL, null=True, blank=True,
-        help_text="Linked quotation item for auto-pricing",
     )
     supplier = models.ForeignKey(
         "rfq.Supplier", on_delete=models.SET_NULL, null=True, blank=True,
     )
     notes = models.TextField(blank=True, default="")
+    sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["cost_type", "id"]
+        ordering = ["sort_order", "id"]
 
     def save(self, *args, **kwargs):
-        # Auto-calculate line total
-        line_total = self.unit_cost * self.quantity
-        self.total_cost = line_total
-
-        # Assign to correct bucket based on cost_type
-        if self.cost_type == self.CostType.MATERIAL:
-            self.material_cost = line_total
-        elif self.cost_type == self.CostType.LABOR:
-            self.labor_cost = line_total
-        elif self.cost_type == self.CostType.OVERHEAD:
-            self.overhead_cost = line_total
-        elif self.cost_type == self.CostType.LOGISTICS:
-            self.logistics_cost = line_total
-        else:
-            self.overhead_cost = line_total  # "Other" goes to overhead
-
+        self.total_cost = self.amount
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.description} ({self.cost_type})"
+        return f"{self.category.name}: {self.amount}"
 
 
+# --------------------------------------------------------------------------
+# Costing Margin Level (Low / Medium / High)
+# --------------------------------------------------------------------------
+class CostingMarginLevel(models.Model):
+    class Label(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    costing_sheet = models.ForeignKey(CostingSheet, on_delete=models.CASCADE, related_name="margin_levels")
+    label = models.CharField(max_length=10, choices=Label.choices)
+
+    # ---- Input percentages (user-configurable per margin level) ----
+    facilitation_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    desired_margin_percent = models.DecimalField(max_digits=5, decimal_places=2, default=20.00)
+    jv_cost_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    cost_of_money_percent = models.DecimalField(max_digits=5, decimal_places=2, default=1.00)
+    municipal_tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=1.00)
+    others_1_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    others_1_label = models.CharField(max_length=100, default="Others 1")
+    others_2_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    others_2_label = models.CharField(max_length=100, default="Others 2")
+    commission_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+
+    # Government deduction rates
+    withholding_tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=2.00)
+    creditable_tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=5.00)
+    warranty_security_percent = models.DecimalField(max_digits=5, decimal_places=2, default=5.00)
+
+    # ---- Computed: Selling price build-up ----
+    facilitation_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    desired_margin_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    jv_cost_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    cost_of_money_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    municipal_tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    others_1_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    others_2_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    gross_selling_vat_ex = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    vat_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    net_selling_vat_inc = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    # ---- Computed: Government deductions ----
+    withholding_tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    creditable_tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    warranty_security_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_govt_deduction = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    net_amount_due = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    # ---- Computed: Profitability ----
+    municipal_tax_revenue_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    net_take_home = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    earning_before_vat = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    output_vat = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    input_vat = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    vat_payable = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    earning_after_vat = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    commission_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    net_profit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    actual_margin_percent = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["costing_sheet", "label"]
+        unique_together = ["costing_sheet", "label"]
+
+    def __str__(self):
+        return f"{self.costing_sheet.sheet_number} — {self.get_label_display()}"
+
+    # ------------------------------------------------------------------
+    # FULL PH-TAX-AWARE COSTING FORMULA (verified against QUO template)
+    # ------------------------------------------------------------------
+    def recalculate(self, total_project_cost, vat_rate, input_vat_base):
+        tpc = D(str(total_project_cost))
+        vr = D(str(vat_rate)) / D("100")
+
+        # Convert all percent fields to Decimal for safety
+        fac = D(str(self.facilitation_percent))
+        dm  = D(str(self.desired_margin_percent))
+        jv  = D(str(self.jv_cost_percent))
+        com = D(str(self.cost_of_money_percent))
+        mt  = D(str(self.municipal_tax_percent))
+        o1  = D(str(self.others_1_percent))
+        o2  = D(str(self.others_2_percent))
+        wht = D(str(self.withholding_tax_percent))
+        crt = D(str(self.creditable_tax_percent))
+        wsp = D(str(self.warranty_security_percent))
+        cmp = D(str(self.commission_percent))
+
+        # Sum of all addon percentages
+        total_pct = fac + dm + jv + com + mt + o1 + o2
+
+        # Gross Selling (VAT Ex) = Total Project Cost / (1 - sum_of_pct%)
+        divisor = D("1") - total_pct / D("100")
+        if divisor > 0:
+            gs = _r(tpc / divisor)
+        else:
+            gs = tpc
+        self.gross_selling_vat_ex = gs
+
+        # Individual addon amounts = gross_selling × pct%
+        self.facilitation_amount = _r(gs * fac / D("100"))
+        self.desired_margin_amount = _r(gs * dm / D("100"))
+        self.jv_cost_amount = _r(gs * jv / D("100"))
+        self.cost_of_money_amount = _r(gs * com / D("100"))
+        self.municipal_tax_amount = _r(gs * mt / D("100"))
+        self.others_1_amount = _r(gs * o1 / D("100"))
+        self.others_2_amount = _r(gs * o2 / D("100"))
+
+        # VAT
+        self.vat_amount = _r(gs * vr)
+        self.net_selling_vat_inc = _r(gs + self.vat_amount)
+        ns = self.net_selling_vat_inc
+
+        # Government deductions
+        self.withholding_tax_amount = _r(gs * wht / D("100"))
+        self.creditable_tax_amount = _r(gs * crt / D("100"))
+        self.warranty_security_amount = _r(ns * wsp / D("100"))
+        self.total_govt_deduction = _r(
+            self.withholding_tax_amount
+            + self.creditable_tax_amount
+            + self.warranty_security_amount
+        )
+        self.net_amount_due = _r(ns - self.total_govt_deduction)
+
+        # Profitability
+        self.municipal_tax_revenue_amount = _r(ns * mt / D("100"))
+        self.net_take_home = _r(
+            self.net_amount_due - self.facilitation_amount - self.municipal_tax_revenue_amount
+        )
+        self.earning_before_vat = _r(self.net_take_home - tpc)
+
+        # VAT passthrough
+        self.output_vat = self.vat_amount
+        ivb = D(str(input_vat_base))
+        self.input_vat = _r(ivb * vr / (D("1") + vr)) if ivb > 0 else D("0")
+        self.vat_payable = _r(self.output_vat - self.input_vat - self.creditable_tax_amount)
+
+        self.earning_after_vat = _r(self.earning_before_vat - self.vat_payable)
+
+        # Commission (based on earning before VAT)
+        self.commission_amount = _r(self.earning_before_vat * cmp / D("100"))
+
+        # Net Profit
+        self.net_profit = _r(self.earning_after_vat - self.commission_amount - self.jv_cost_amount)
+
+        # Actual margin %
+        if self.net_selling_vat_inc > 0:
+            self.actual_margin_percent = _r(self.net_profit / self.net_selling_vat_inc * D("100"))
+        else:
+            self.actual_margin_percent = D("0")
+
+        self.save()
+
+        # Recalculate commission splits
+        for cs in self.commission_splits.all():
+            cs.amount = _r(self.commission_amount * D(str(cs.percent)) / D("100"))
+            cs.save(update_fields=["amount"])
+
+
+# --------------------------------------------------------------------------
+# Commission Split (per margin level)
+# --------------------------------------------------------------------------
+class CostingCommissionSplit(models.Model):
+    margin_level = models.ForeignKey(
+        CostingMarginLevel, on_delete=models.CASCADE, related_name="commission_splits",
+    )
+    role = models.ForeignKey(CommissionRole, on_delete=models.CASCADE)
+    percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["role__sort_order"]
+        unique_together = ["margin_level", "role"]
+
+    def __str__(self):
+        return f"{self.role.name}: {self.percent}% = {self.amount}"
+
+
+# --------------------------------------------------------------------------
+# Version snapshots
+# --------------------------------------------------------------------------
 class CostingVersion(models.Model):
-    """
-    Historical snapshot of a costing sheet for version control.
-    Created automatically when a costing sheet is updated/approved.
-    """
-    costing_sheet = models.ForeignKey(
-        CostingSheet, on_delete=models.CASCADE, related_name="versions",
-    )
+    costing_sheet = models.ForeignKey(CostingSheet, on_delete=models.CASCADE, related_name="versions")
     version_number = models.PositiveIntegerField()
-    snapshot_data = models.JSONField(
-        help_text="JSON snapshot of the costing sheet and all line items at this version",
-    )
+    snapshot_data = models.JSONField()
     change_summary = models.TextField(blank=True, default="")
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
-    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -223,80 +365,49 @@ class CostingVersion(models.Model):
         return f"{self.costing_sheet.sheet_number} — v{self.version_number}"
 
 
+# --------------------------------------------------------------------------
+# Scenario (What-If)
+# --------------------------------------------------------------------------
 class Scenario(models.Model):
-    """
-    What-if analysis: compare different supplier/material choices.
-    Each scenario is a variant of a costing sheet with modified inputs.
-    """
-    costing_sheet = models.ForeignKey(
-        CostingSheet, on_delete=models.CASCADE, related_name="scenarios",
-    )
-    name = models.CharField(max_length=255, help_text="e.g. 'Supplier B + Air Freight'")
+    costing_sheet = models.ForeignKey(CostingSheet, on_delete=models.CASCADE, related_name="scenarios")
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
-
-    # Scenario overrides (JSON: list of line item modifications)
-    overrides = models.JSONField(
-        default=dict,
-        help_text="JSON dict mapping line_item_id -> {field: new_value}",
-    )
-
-    # Calculated results
+    overrides = models.JSONField(default=dict)
     projected_total_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     projected_selling_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     projected_margin_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
-    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Scenario: {self.name} for {self.costing_sheet.sheet_number}"
+        return f"Scenario: {self.name}"
 
     def calculate(self):
-        """
-        Apply overrides to the costing sheet line items and recalculate totals.
-        Does NOT modify the original costing sheet — read-only projection.
-
-        Formula:
-          Adjusted Cost   = sum of (unit_cost × quantity) for every line item
-                            after overrides are applied
-          Selling Price   = Adjusted Cost × (1 + margin%)
-          Margin          = overrides["__margin__"] if present,
-                            otherwise the costing sheet's target_margin_percent
-        """
-        from decimal import Decimal
-
+        from decimal import Decimal as D
         base_items = self.costing_sheet.line_items.all()
-        total = Decimal("0.00")
-
+        total = D("0")
         for item in base_items:
-            item_id_str = str(item.id)
-            if item_id_str in self.overrides:
-                mods = self.overrides[item_id_str]
-                unit_cost = Decimal(str(mods.get("unit_cost", item.unit_cost)))
-                quantity = Decimal(str(mods.get("quantity", item.quantity)))
+            sid = str(item.id)
+            if sid in self.overrides:
+                mods = self.overrides[sid]
+                amt = D(str(mods.get("amount", item.amount)))
             else:
-                unit_cost = item.unit_cost
-                quantity = item.quantity
-            total += unit_cost * quantity
+                amt = item.amount
+            total += amt
 
-        # Adjusted Cost = raw total of line items (no stacking of previous prices)
-        self.projected_total_cost = total
+        cs = self.costing_sheet
+        contingency = total * cs.contingency_percent / D("100")
+        tpc = total + contingency
+        self.projected_total_cost = _r(tpc)
 
-        # Margin: allow override via special "__margin__" key in overrides
-        if "__margin__" in self.overrides:
-            margin = Decimal(str(self.overrides["__margin__"]))
+        margin = D(str(self.overrides.get("__margin__", cs.margin_levels.filter(label="LOW").first().desired_margin_percent if cs.margin_levels.exists() else 20)))
+        divisor = D("1") - margin / D("100")
+        if divisor > 0:
+            self.projected_selling_price = _r(tpc / divisor)
         else:
-            margin = self.costing_sheet.target_margin_percent
-
-        # Selling Price = Adjusted Cost × (1 + Margin%)
-        self.projected_selling_price = total * (1 + margin / 100)
-
-        # Margin = the applied percentage directly
+            self.projected_selling_price = tpc
         self.projected_margin_percent = margin
-
         self.save()

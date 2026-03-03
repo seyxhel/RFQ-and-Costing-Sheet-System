@@ -1,3 +1,7 @@
+# ============================================================================
+# products/serializers.py — Product catalog serializers
+# ============================================================================
+
 from rest_framework import serializers
 from .models import Category, Product
 
@@ -17,17 +21,10 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            "id", "sku", "name", "description", "category", "category_name",
-            "unit", "specifications", "estimated_unit_cost",
-            "is_active", "created_at", "updated_at",
+            "id", "sku", "name", "description",
+            "category", "category_name",
+            "unit", "specifications",
+            "estimated_unit_cost", "is_active",
+            "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
-
-    def create(self, validated_data):
-        # Auto-generate SKU if not provided
-        if not validated_data.get("sku"):
-            import datetime
-            prefix = "PRD"
-            count = Product.objects.count() + 1
-            validated_data["sku"] = f"{prefix}-{count:05d}"
-        return super().create(validated_data)

@@ -87,3 +87,20 @@ class ChangePasswordSerializer(serializers.Serializer):
         if data["new_password"] != data["confirm_password"]:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         return data
+
+
+# --------------------------------------------------------------------------
+# Attachment (generic file uploads)
+# --------------------------------------------------------------------------
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.CharField(source="uploaded_by.get_full_name", read_only=True)
+
+    class Meta:
+        from .models import Attachment
+        model = Attachment
+        fields = [
+            "id", "file", "filename", "file_size", "description",
+            "content_type", "object_id",
+            "uploaded_by", "uploaded_by_name", "uploaded_at",
+        ]
+        read_only_fields = ["id", "filename", "file_size", "uploaded_by", "uploaded_at"]

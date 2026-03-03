@@ -2,36 +2,87 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
-import { costingAPI, lineItemAPI } from '../../services/costingService';
+import { costingAPI, costCategoryAPI } from '../../services/costingService';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 
-const EMPTY_ITEM = { cost_type: 'MATERIAL', description: '', quantity: '1', unit: 'pcs', unit_cost: '0', notes: '' };
-const CATEGORIES = [
-  { value: 'MATERIAL', label: 'Material' },
-  { value: 'LABOR', label: 'Labor' },
-  { value: 'OVERHEAD', label: 'Overhead' },
-  { value: 'LOGISTICS', label: 'Logistics' },
-  { value: 'OTHER', label: 'Other' },
-];
+const MARGIN_LABELS = ['LOW', 'MEDIUM', 'HIGH'] as const;
+const MARGIN_DISPLAY: Record<string, string> = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High' };
+
+const DEFAULT_MARGIN = (label: string) => ({
+  label,
+  facilitation_percent: '10.00',
+  desired_margin_percent: label === 'LOW' ? '20.00' : label === 'MEDIUM' ? '40.00' : '50.00',
+  jv_cost_percent: '0.00',
+  cost_of_money_percent: '1.00',
+  municipal_tax_percent: '1.00',
+  others_1_percent: '0.00', others_1_label: 'Others 1',
+  others_2_percent: '0.00', others_2_label: 'Others 2',
+  commission_percent: '10.00',
+  withholding_tax_percent: '2.00',
+  creditable_tax_percent: '5.00',
+  warranty_security_percent: '5.00',
+});
+
+const EMPTY_ITEM = { category: '', description: '', amount: '0', notes: '' };
 
 export default function CostingForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ title: '', description: '', target_margin_percent: '20.00', status: 'DRAFT' });
+  const [form, setForm] = useState({
+    title: '', description: '', project_title: '', client_name: '',
+    date: new Date().toISOString().split('T')[0], warranty: '',
+    contingency_percent: '5.00', vat_rate: '12.00', status: 'DRAFT',
+  });
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
+  const [margins, setMargins] = useState(MARGIN_LABELS.map((l) => DEFAULT_MARGIN(l)));
+  const [activeTab, setActiveTab] = useState<string>('LOW');
+  const [categories, setCategories] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Load cost categories
+  useEffect(() => {
+    costCategoryAPI.list().then((r) => setCategories(r.data.results || r.data || [])).catch(() => {});
+  }, []);
+
+  // Load existing sheet in edit mode
   useEffect(() => {
     if (isEdit) {
       costingAPI.get(Number(id)).then((r) => {
         const d = r.data;
-        setForm({ title: d.title || '', description: d.description || '', target_margin_percent: d.target_margin_percent || '20.00', status: d.status || 'DRAFT' });
-        if (d.line_items?.length) setItems(d.line_items.map((li: any) => ({
-          id: li.id, cost_type: li.cost_type || 'MATERIAL', description: li.description, quantity: li.quantity, unit: li.unit, unit_cost: li.unit_cost, notes: li.notes || ''
-        })));
+        setForm({
+          title: d.title || '', description: d.description || '',
+          project_title: d.project_title || '', client_name: d.client_name || '',
+          date: d.date || new Date().toISOString().split('T')[0],
+          warranty: d.warranty || '', contingency_percent: d.contingency_percent || '5.00',
+          vat_rate: d.vat_rate || '12.00', status: d.status || 'DRAFT',
+        });
+        if (d.line_items?.length) {
+          setItems(d.line_items.map((li: any) => ({
+            category: li.category || '', description: li.description || '',
+            amount: li.amount || '0', notes: li.notes || '',
+          })));
+        }
+        if (d.margin_levels?.length) {
+          setMargins(d.margin_levels.map((ml: any) => ({
+            label: ml.label,
+            facilitation_percent: ml.facilitation_percent || '10.00',
+            desired_margin_percent: ml.desired_margin_percent || '20.00',
+            jv_cost_percent: ml.jv_cost_percent || '0.00',
+            cost_of_money_percent: ml.cost_of_money_percent || '1.00',
+            municipal_tax_percent: ml.municipal_tax_percent || '1.00',
+            others_1_percent: ml.others_1_percent || '0.00',
+            others_1_label: ml.others_1_label || 'Others 1',
+            others_2_percent: ml.others_2_percent || '0.00',
+            others_2_label: ml.others_2_label || 'Others 2',
+            commission_percent: ml.commission_percent || '10.00',
+            withholding_tax_percent: ml.withholding_tax_percent || '2.00',
+            creditable_tax_percent: ml.creditable_tax_percent || '5.00',
+            warranty_security_percent: ml.warranty_security_percent || '5.00',
+          })));
+        }
       }).catch(() => { toast.error('Failed to load'); navigate('/costing'); });
     }
   }, [id, isEdit, navigate]);
@@ -47,45 +98,89 @@ export default function CostingForm() {
   const addItem = () => setItems((p) => [...p, { ...EMPTY_ITEM }]);
   const removeItem = (idx: number) => setItems((p) => p.length > 1 ? p.filter((_, i) => i !== idx) : p);
 
-  const totalCost = items.reduce((sum, it) => sum + Number(it.quantity || 0) * Number(it.unit_cost || 0), 0);
+  const handleMarginChange = (label: string, field: string, val: string) => {
+    setMargins((p) => p.map((m) => m.label === label ? { ...m, [field]: val } : m));
+  };
+
+  const totalCost = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+  const contingencyAmt = totalCost * Number(form.contingency_percent || 0) / 100;
+  const totalProjectCost = totalCost + contingencyAmt;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, line_items: items };
-      if (isEdit) { await costingAPI.update(Number(id), payload); toast.success('Costing sheet updated'); }
-      else { await costingAPI.create(payload); toast.success('Costing sheet created'); }
+      const payload = { ...form, line_items: items, margin_levels: margins };
+      if (isEdit) {
+        await costingAPI.update(Number(id), payload);
+        toast.success('Costing sheet updated');
+      } else {
+        await costingAPI.create(payload);
+        toast.success('Costing sheet created');
+      }
       navigate('/costing');
-    } catch { toast.error('Failed to save'); }
-    finally { setSaving(false); }
+    } catch {
+      toast.error('Failed to save');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputCls = 'w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none';
+  const labelCls = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
+  const smallLabelCls = 'block text-xs font-medium text-gray-500 mb-1';
+
+  const activeMargin = margins.find((m) => m.label === activeTab) || margins[0];
+
+  // Client-side preview of gross selling for each margin tab
+  const previewGrossSelling = (m: typeof activeMargin) => {
+    const totalPct = [m.facilitation_percent, m.desired_margin_percent, m.jv_cost_percent, m.cost_of_money_percent, m.municipal_tax_percent, m.others_1_percent, m.others_2_percent]
+      .reduce((s, v) => s + Number(v || 0), 0);
+    const divisor = 1 - totalPct / 100;
+    return divisor > 0 ? totalProjectCost / divisor : totalProjectCost;
+  };
+
+  const previewNetSelling = (m: typeof activeMargin) => {
+    const gs = previewGrossSelling(m);
+    return gs * (1 + Number(form.vat_rate || 0) / 100);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Costing Sheet' : 'New Costing Sheet'}</h1>
-          <p className="text-gray-500 dark:text-gray-400">Define product cost breakdown</p>
+          <p className="text-gray-500 dark:text-gray-400">PH-tax-aware cost breakdown with 3-margin model</p>
         </div>
         <GreenButton variant="outline" onClick={() => navigate('/costing')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* ---- Sheet Details ---- */}
         <Card accent title="Sheet Details">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Title <span className="text-red-500">*</span></label>
-              <input name="title" value={form.title} onChange={handleChange} required className={inputCls} />
+              <label className={labelCls}>Title <span className="text-red-500">*</span></label>
+              <input name="title" value={form.title} onChange={handleChange} required className={inputCls} placeholder="Sheet title" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Target Margin %</label>
-              <input name="target_margin_percent" type="number" min="0" max="100" step="0.01" value={form.target_margin_percent} onChange={handleChange} className={inputCls} />
+              <label className={labelCls}>Project Title</label>
+              <input name="project_title" value={form.project_title} onChange={handleChange} className={inputCls} placeholder="e.g. IT Infrastructure Upgrade" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Status</label>
+              <label className={labelCls}>Client Name</label>
+              <input name="client_name" value={form.client_name} onChange={handleChange} className={inputCls} placeholder="e.g. ABC Corporation" />
+            </div>
+            <div>
+              <label className={labelCls}>Date</label>
+              <input name="date" type="date" value={form.date} onChange={handleChange} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Warranty</label>
+              <input name="warranty" value={form.warranty} onChange={handleChange} className={inputCls} placeholder="e.g. 1 Year Parts & Labor" />
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
               <select name="status" value={form.status} onChange={handleChange} className={inputCls}>
                 <option value="DRAFT">Draft</option>
                 <option value="IN_REVIEW">In Review</option>
@@ -93,43 +188,47 @@ export default function CostingForm() {
                 <option value="ARCHIVED">Archived</option>
               </select>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
-              <textarea name="description" value={form.description} onChange={handleChange} rows={2} className={inputCls + ' resize-none'} />
+            <div>
+              <label className={labelCls}>Contingency %</label>
+              <input name="contingency_percent" type="number" step="0.01" min="0" max="100" value={form.contingency_percent} onChange={handleChange} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>VAT Rate %</label>
+              <input name="vat_rate" type="number" step="0.01" min="0" max="100" value={form.vat_rate} onChange={handleChange} className={inputCls} />
+            </div>
+            <div className="md:col-span-3">
+              <label className={labelCls}>Description</label>
+              <textarea name="description" value={form.description} onChange={handleChange} rows={2} className={inputCls + ' resize-none'} placeholder="Optional notes..." />
             </div>
           </div>
         </Card>
 
+        {/* ---- Cost Line Items ---- */}
         <Card accent title="Cost Line Items">
           <div className="space-y-3">
             {items.map((it, idx) => (
               <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="w-36">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-                    <select value={it.cost_type} onChange={(e) => handleItemChange(idx, 'cost_type', e.target.value)} className={inputCls}>
-                      {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  <div className="w-44">
+                    <label className={smallLabelCls}>Category <span className="text-red-500">*</span></label>
+                    <select value={it.category} onChange={(e) => handleItemChange(idx, 'category', e.target.value)} required className={inputCls}>
+                      <option value="">Select...</option>
+                      {categories.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}{c.has_input_vat ? ' (VAT)' : ''}</option>
+                      ))}
                     </select>
                   </div>
-                  <div className="flex-1 min-w-[160px]">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                    <input value={it.description} onChange={(e) => handleItemChange(idx, 'description', e.target.value)} className={inputCls} />
+                  <div className="flex-1 min-w-[180px]">
+                    <label className={smallLabelCls}>Description</label>
+                    <input value={it.description} onChange={(e) => handleItemChange(idx, 'description', e.target.value)} className={inputCls} placeholder="Line item description" />
                   </div>
-                  <div className="w-24">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Qty</label>
-                    <input type="number" min="0" value={it.quantity} onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)} className={inputCls} />
+                  <div className="w-36">
+                    <label className={smallLabelCls}>Amount (PHP)</label>
+                    <input type="number" step="0.01" min="0" value={it.amount} onChange={(e) => handleItemChange(idx, 'amount', e.target.value)} className={inputCls} />
                   </div>
-                  <div className="w-24">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Unit</label>
-                    <input value={it.unit} onChange={(e) => handleItemChange(idx, 'unit', e.target.value)} className={inputCls} />
-                  </div>
-                  <div className="w-28">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Unit Cost</label>
-                    <input type="number" step="0.01" min="0" value={it.unit_cost} onChange={(e) => handleItemChange(idx, 'unit_cost', e.target.value)} className={inputCls} />
-                  </div>
-                  <div className="w-24 text-right">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Subtotal</label>
-                    <p className="py-2.5 text-sm font-semibold text-gray-900 dark:text-white">${(Number(it.quantity || 0) * Number(it.unit_cost || 0)).toFixed(2)}</p>
+                  <div className="w-36">
+                    <label className={smallLabelCls}>Notes</label>
+                    <input value={it.notes} onChange={(e) => handleItemChange(idx, 'notes', e.target.value)} className={inputCls} placeholder="Optional" />
                   </div>
                   <button type="button" onClick={() => removeItem(idx)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -137,14 +236,118 @@ export default function CostingForm() {
             ))}
             <div className="flex items-center justify-between mt-3">
               <button type="button" onClick={addItem} className="flex items-center gap-2 text-sm text-[#0E8F79] hover:text-[#3BC25B] font-medium"><Plus className="w-4 h-4" /> Add Line Item</button>
-              <div className="text-right">
-                <span className="text-sm text-gray-500 mr-3">Total Cost:</span>
-                <span className="text-lg font-bold text-gray-900 dark:text-white">${totalCost.toFixed(2)}</span>
+              <div className="text-right space-y-1">
+                <div><span className="text-xs text-gray-500 mr-2">Total Cost:</span><span className="text-sm font-bold text-gray-900 dark:text-white">₱{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                <div><span className="text-xs text-gray-500 mr-2">Contingency ({form.contingency_percent}%):</span><span className="text-sm font-semibold text-gray-700 dark:text-gray-300">₱{contingencyAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                <div><span className="text-xs text-gray-500 mr-2">Total Project Cost:</span><span className="text-lg font-bold text-[#0E8F79]">₱{totalProjectCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
               </div>
             </div>
           </div>
         </Card>
 
+        {/* ---- Margin Levels (Tabs) ---- */}
+        <Card accent title="Margin Levels">
+          <div className="mb-4">
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              {MARGIN_LABELS.map((label) => {
+                const gs = previewGrossSelling(margins.find((m) => m.label === label)!);
+                return (
+                  <button key={label} type="button" onClick={() => setActiveTab(label)}
+                    className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === label
+                      ? 'border-[#3BC25B] text-[#0E8F79] dark:text-[#3BC25B]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                    {MARGIN_DISPLAY[label]}
+                    <span className="ml-2 text-xs opacity-70">₱{gs.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active margin level inputs */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Selling Price Build-Up Percentages</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { field: 'facilitation_percent', label: 'Facilitation %' },
+                { field: 'desired_margin_percent', label: 'Desired Margin %' },
+                { field: 'jv_cost_percent', label: 'JV Cost %' },
+                { field: 'cost_of_money_percent', label: 'Cost of Money %' },
+                { field: 'municipal_tax_percent', label: 'Municipal Tax %' },
+                { field: 'commission_percent', label: 'Commission %' },
+              ].map(({ field, label }) => (
+                <div key={field}>
+                  <label className={smallLabelCls}>{label}</label>
+                  <input type="number" step="0.01" min="0" max="100"
+                    value={(activeMargin as any)[field]}
+                    onChange={(e) => handleMarginChange(activeTab, field, e.target.value)}
+                    className={inputCls} />
+                </div>
+              ))}
+            </div>
+
+            {/* Others 1 & 2 with custom labels */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className={smallLabelCls}>Others 1 Label</label>
+                <input value={activeMargin.others_1_label} onChange={(e) => handleMarginChange(activeTab, 'others_1_label', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={smallLabelCls}>Others 1 %</label>
+                <input type="number" step="0.01" min="0" max="100" value={activeMargin.others_1_percent} onChange={(e) => handleMarginChange(activeTab, 'others_1_percent', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={smallLabelCls}>Others 2 Label</label>
+                <input value={activeMargin.others_2_label} onChange={(e) => handleMarginChange(activeTab, 'others_2_label', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={smallLabelCls}>Others 2 %</label>
+                <input type="number" step="0.01" min="0" max="100" value={activeMargin.others_2_percent} onChange={(e) => handleMarginChange(activeTab, 'others_2_percent', e.target.value)} className={inputCls} />
+              </div>
+            </div>
+
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-4">Government Deduction Rates</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className={smallLabelCls}>Withholding Tax %</label>
+                <input type="number" step="0.01" min="0" max="100" value={activeMargin.withholding_tax_percent} onChange={(e) => handleMarginChange(activeTab, 'withholding_tax_percent', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={smallLabelCls}>Creditable Tax %</label>
+                <input type="number" step="0.01" min="0" max="100" value={activeMargin.creditable_tax_percent} onChange={(e) => handleMarginChange(activeTab, 'creditable_tax_percent', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={smallLabelCls}>Warranty Security %</label>
+                <input type="number" step="0.01" min="0" max="100" value={activeMargin.warranty_security_percent} onChange={(e) => handleMarginChange(activeTab, 'warranty_security_percent', e.target.value)} className={inputCls} />
+              </div>
+            </div>
+
+            {/* Live preview */}
+            <div className="mt-4 p-4 bg-gradient-to-r from-[#0E8F79]/5 to-[#3BC25B]/5 dark:from-[#0E8F79]/10 dark:to-[#3BC25B]/10 rounded-lg border border-[#3BC25B]/20">
+              <h4 className="text-sm font-semibold text-[#0E8F79] mb-3">Live Preview — {MARGIN_DISPLAY[activeTab]}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-gray-500">Gross Selling (VAT Ex)</p>
+                  <p className="font-bold text-gray-900 dark:text-white">₱{previewGrossSelling(activeMargin).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">VAT ({form.vat_rate}%)</p>
+                  <p className="font-bold text-gray-900 dark:text-white">₱{(previewGrossSelling(activeMargin) * Number(form.vat_rate || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Net Selling (VAT Inc)</p>
+                  <p className="font-bold text-[#0E8F79]">₱{previewNetSelling(activeMargin).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Total Project Cost</p>
+                  <p className="font-bold text-gray-900 dark:text-white">₱{totalProjectCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* ---- Submit ---- */}
         <div className="flex gap-3">
           <GreenButton type="submit" isLoading={saving}>{isEdit ? 'Update Sheet' : 'Create Sheet'}</GreenButton>
           <GreenButton type="button" variant="outline" onClick={() => navigate('/costing')}>Cancel</GreenButton>

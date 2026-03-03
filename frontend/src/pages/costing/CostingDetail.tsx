@@ -5,10 +5,12 @@ import { GreenButton } from '../../components/ui/GreenButton';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { costingAPI } from '../../services/costingService';
 import { toast } from 'sonner';
-import { ArrowLeft, Pencil, Download, FlaskConical, RefreshCw, Camera, History, ChevronDown, ChevronUp } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { ArrowLeft, Pencil, RefreshCw, Camera, History, ChevronDown, ChevronUp, CheckCircle, Send, FlaskConical } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-const CATEGORY_COLORS: Record<string, string> = { MATERIAL: '#3BC25B', LABOR: '#3B82F6', OVERHEAD: '#A855F7', LOGISTICS: '#F59E0B', OTHER: '#6B7280' };
+const CATEGORY_COLORS = ['#3BC25B', '#3B82F6', '#A855F7', '#F59E0B', '#EF4444', '#06B6D4', '#F97316'];
+const MARGIN_DISPLAY: Record<string, string> = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High' };
+const fmt = (v: any) => `₱${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
 export default function CostingDetail() {
   const { id } = useParams();
@@ -18,6 +20,7 @@ export default function CostingDetail() {
   const [versions, setVersions] = useState<any[]>([]);
   const [showVersions, setShowVersions] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<number | null>(null);
+  const [activeMargin, setActiveMargin] = useState<string>('LOW');
 
   const load = () => {
     costingAPI.get(Number(id)).then((r) => { setSheet(r.data); setLoading(false); }).catch(() => { toast.error('Failed to load'); navigate('/costing'); });
@@ -32,42 +35,44 @@ export default function CostingDetail() {
   const handleRecalc = () => {
     costingAPI.recalculate(Number(id)).then((r) => { setSheet(r.data); toast.success('Recalculated'); }).catch(() => toast.error('Recalculation failed'));
   };
+  const handleSubmit = () => {
+    costingAPI.submit(Number(id)).then((r) => { setSheet(r.data); toast.success('Submitted for review'); }).catch(() => toast.error('Submit failed'));
+  };
+  const handleApprove = () => {
+    costingAPI.approve(Number(id)).then((r) => { setSheet(r.data); toast.success('Approved'); }).catch(() => toast.error('Approve failed'));
+  };
   const handleSnapshot = () => {
     costingAPI.snapshot(Number(id)).then((r) => {
       toast.success(`Snapshot v${r.data?.version_number || ''} saved`);
-      loadVersions();
-      load();
+      loadVersions(); load();
     }).catch(() => toast.error('Snapshot failed'));
-  };
-  const handleExport = (format: 'csv' | 'json') => {
-    const fn = format === 'csv' ? costingAPI.exportCSV : costingAPI.exportJSON;
-    fn(Number(id)).then((r) => {
-      const blob = format === 'csv'
-        ? r.data  // already a Blob via responseType: 'blob'
-        : new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `costing-${id}.${format}`; a.click(); URL.revokeObjectURL(url);
-    }).catch(() => toast.error('Export failed'));
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-[#3BC25B] border-t-transparent rounded-full animate-spin" /></div>;
   if (!sheet) return null;
 
   const items = sheet.line_items || [];
-  // Aggregate by cost_type for pie chart
+  const marginLevels = sheet.margin_levels || [];
+  const ml = marginLevels.find((m: any) => m.label === activeMargin) || marginLevels[0];
+
+  // Pie chart by category
   const catTotals: Record<string, number> = {};
-  items.forEach((it: any) => { catTotals[it.cost_type] = (catTotals[it.cost_type] || 0) + Number(it.total_cost || 0); });
+  items.forEach((it: any) => {
+    const name = it.category_name || 'Other';
+    catTotals[name] = (catTotals[name] || 0) + Number(it.total_cost || 0);
+  });
   const pieData = Object.entries(catTotals).map(([name, value]) => ({ name, value }));
-  const COST_TYPE_LABELS: Record<string, string> = { MATERIAL: 'Material', LABOR: 'Labor', OVERHEAD: 'Overhead', LOGISTICS: 'Logistics', OTHER: 'Other' };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{sheet.title}</h1>
             <StatusBadge status={sheet.status || 'draft'} />
           </div>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">{sheet.description || 'No description'}</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">{sheet.sheet_number} — {sheet.project_title || 'No project'} — {sheet.client_name || 'No client'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <GreenButton variant="outline" onClick={() => navigate('/costing')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
@@ -77,14 +82,17 @@ export default function CostingDetail() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[{ label: 'Total Cost', value: `$${Number(sheet.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, color: 'text-gray-900 dark:text-white' },
-          { label: 'Target Margin', value: `${sheet.target_margin_percent || 0}%`, color: 'text-[#0E8F79]' },
-          { label: 'Selling Price', value: `$${Number(sheet.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, color: 'text-gray-900 dark:text-white' },
-          { label: 'Line Items', value: `${items.length}`, color: 'text-gray-900 dark:text-white' }].map((s, i) => (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: 'Total Cost', value: fmt(sheet.total_cost), color: 'text-gray-900 dark:text-white' },
+          { label: 'Contingency', value: `${sheet.contingency_percent}%  (${fmt(sheet.contingency_amount)})`, color: 'text-gray-600 dark:text-gray-400' },
+          { label: 'Total Project Cost', value: fmt(sheet.total_project_cost), color: 'text-[#0E8F79]' },
+          { label: 'VAT Rate', value: `${sheet.vat_rate}%`, color: 'text-gray-900 dark:text-white' },
+          { label: 'Margin Levels', value: `${marginLevels.length}`, color: 'text-gray-900 dark:text-white' },
+        ].map((s, i) => (
           <Card key={i}>
             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">{s.label}</p>
-            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+            <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
           </Card>
         ))}
       </div>
@@ -99,10 +107,8 @@ export default function CostingDetail() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Category</th>
                     <th className="px-4 py-3 font-semibold">Description</th>
-                    <th className="px-4 py-3 font-semibold text-right">Qty</th>
-                    <th className="px-4 py-3 font-semibold">Unit</th>
-                    <th className="px-4 py-3 font-semibold text-right">Unit Cost</th>
-                    <th className="px-4 py-3 font-semibold text-right">Total</th>
+                    <th className="px-4 py-3 font-semibold text-center">Input VAT</th>
+                    <th className="px-4 py-3 font-semibold text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -110,36 +116,37 @@ export default function CostingDetail() {
                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[it.cost_type] || '#6B7280' }} />
-                          {COST_TYPE_LABELS[it.cost_type] || it.cost_type}
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }} />
+                          {it.category_name || 'Unknown'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-800 dark:text-gray-200">{it.description}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{it.quantity}</td>
-                      <td className="px-4 py-3 text-gray-500">{it.unit}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">₱{Number(it.unit_cost).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">₱{(Number(it.quantity) * Number(it.unit_cost)).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-gray-800 dark:text-gray-200">{it.description || '—'}</td>
+                      <td className="px-4 py-3 text-center">{it.has_input_vat ? <span className="text-[#3BC25B] text-xs font-medium">Yes</span> : <span className="text-gray-400 text-xs">No</span>}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">{fmt(it.total_cost)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="border-t-2 border-gray-200 dark:border-gray-600 font-bold">
-                  <tr><td colSpan={5} className="px-4 py-3 text-gray-900 dark:text-white">Total</td><td className="px-4 py-3 text-right text-gray-900 dark:text-white">₱{Number(sheet.total_cost || 0).toFixed(2)}</td></tr>
+                  <tr><td colSpan={3} className="px-4 py-3 text-gray-900 dark:text-white">Total Cost</td><td className="px-4 py-3 text-right text-gray-900 dark:text-white">{fmt(sheet.total_cost)}</td></tr>
+                  <tr><td colSpan={3} className="px-4 py-2 text-gray-500 text-xs font-normal">Contingency ({sheet.contingency_percent}%)</td><td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400 text-xs">{fmt(sheet.contingency_amount)}</td></tr>
+                  <tr><td colSpan={3} className="px-4 py-3 text-[#0E8F79]">Total Project Cost</td><td className="px-4 py-3 text-right text-[#0E8F79]">{fmt(sheet.total_project_cost)}</td></tr>
                 </tfoot>
               </table>
             </div>
           </Card>
         </div>
 
-        {/* Right side: Pie chart + actions */}
+        {/* Right side: Pie chart + actions + details */}
         <div className="space-y-6">
           {pieData.length > 0 && (
             <Card title="Cost Distribution">
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${COST_TYPE_LABELS[name] || name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
-                    {pieData.map((entry, i) => <Cell key={i} fill={CATEGORY_COLORS[entry.name] || '#6B7280'} />)}
+                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
+                    {pieData.map((_, i) => <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `₱${v.toFixed(2)}`} />
+                  <Tooltip formatter={(v: number) => fmt(v)} />
                 </PieChart>
               </ResponsiveContainer>
             </Card>
@@ -148,25 +155,194 @@ export default function CostingDetail() {
           <Card title="Actions">
             <div className="space-y-2">
               <GreenButton fullWidth onClick={handleRecalc}><RefreshCw className="w-4 h-4 mr-2" /> Recalculate</GreenButton>
+              {sheet.status === 'DRAFT' && <GreenButton fullWidth variant="outline" onClick={handleSubmit}><Send className="w-4 h-4 mr-2" /> Submit for Review</GreenButton>}
+              {sheet.status === 'IN_REVIEW' && <GreenButton fullWidth variant="outline" onClick={handleApprove}><CheckCircle className="w-4 h-4 mr-2" /> Approve</GreenButton>}
               <GreenButton fullWidth variant="outline" onClick={handleSnapshot}><Camera className="w-4 h-4 mr-2" /> Save Snapshot</GreenButton>
-              <GreenButton fullWidth variant="outline" onClick={() => handleExport('csv')}><Download className="w-4 h-4 mr-2" /> Export CSV</GreenButton>
-              <GreenButton fullWidth variant="outline" onClick={() => handleExport('json')}><Download className="w-4 h-4 mr-2" /> Export JSON</GreenButton>
             </div>
           </Card>
 
           <Card title="Details">
             <div className="space-y-3 text-sm">
-              {[{ l: 'Sheet #', v: sheet.sheet_number || '—' },
+              {[
+                { l: 'Sheet #', v: sheet.sheet_number || '—' },
                 { l: 'Version', v: `v${sheet.version || 1}` },
+                { l: 'Warranty', v: sheet.warranty || '—' },
+                { l: 'Date', v: sheet.date || '—' },
                 { l: 'Created', v: sheet.created_at ? new Date(sheet.created_at).toLocaleDateString() : '—' },
-                { l: 'Updated', v: sheet.updated_at ? new Date(sheet.updated_at).toLocaleDateString() : '—' },
-                { l: 'Created By', v: sheet.created_by_name || '—' }].map((item, i) => (
+                { l: 'Created By', v: sheet.created_by_name || '—' },
+              ].map((item, i) => (
                 <div key={i} className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{item.l}</span><span className="font-medium text-gray-900 dark:text-white">{item.v}</span></div>
               ))}
             </div>
           </Card>
         </div>
       </div>
+
+      {/* ---- Margin Levels Detail ---- */}
+      {marginLevels.length > 0 && (
+        <Card accent title="Margin Level Analysis">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+            {marginLevels.map((m: any) => (
+              <button key={m.label} onClick={() => setActiveMargin(m.label)}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${activeMargin === m.label
+                  ? 'border-[#3BC25B] text-[#0E8F79] dark:text-[#3BC25B]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                {MARGIN_DISPLAY[m.label] || m.label}
+                <span className="ml-2 text-xs opacity-70">{fmt(m.net_selling_vat_inc)}</span>
+              </button>
+            ))}
+          </div>
+
+          {ml && (
+            <div className="space-y-6">
+              {/* Selling Price Build-Up */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Selling Price Build-Up</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Component</th>
+                        <th className="px-4 py-2 text-right">Rate</th>
+                        <th className="px-4 py-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      <tr><td className="px-4 py-2">Total Project Cost</td><td className="px-4 py-2 text-right">—</td><td className="px-4 py-2 text-right font-semibold">{fmt(sheet.total_project_cost)}</td></tr>
+                      <tr><td className="px-4 py-2">Facilitation</td><td className="px-4 py-2 text-right">{ml.facilitation_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.facilitation_amount)}</td></tr>
+                      <tr><td className="px-4 py-2">Desired Margin</td><td className="px-4 py-2 text-right">{ml.desired_margin_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.desired_margin_amount)}</td></tr>
+                      <tr><td className="px-4 py-2">JV Cost</td><td className="px-4 py-2 text-right">{ml.jv_cost_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.jv_cost_amount)}</td></tr>
+                      <tr><td className="px-4 py-2">Cost of Money</td><td className="px-4 py-2 text-right">{ml.cost_of_money_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.cost_of_money_amount)}</td></tr>
+                      <tr><td className="px-4 py-2">Municipal Tax</td><td className="px-4 py-2 text-right">{ml.municipal_tax_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.municipal_tax_amount)}</td></tr>
+                      {Number(ml.others_1_percent) > 0 && <tr><td className="px-4 py-2">{ml.others_1_label || 'Others 1'}</td><td className="px-4 py-2 text-right">{ml.others_1_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.others_1_amount)}</td></tr>}
+                      {Number(ml.others_2_percent) > 0 && <tr><td className="px-4 py-2">{ml.others_2_label || 'Others 2'}</td><td className="px-4 py-2 text-right">{ml.others_2_percent}%</td><td className="px-4 py-2 text-right">{fmt(ml.others_2_amount)}</td></tr>}
+                    </tbody>
+                    <tfoot className="border-t-2 border-gray-200 dark:border-gray-600 font-bold">
+                      <tr className="bg-gray-50 dark:bg-gray-700/30"><td className="px-4 py-3">Gross Selling (VAT Ex)</td><td className="px-4 py-3 text-right">—</td><td className="px-4 py-3 text-right">{fmt(ml.gross_selling_vat_ex)}</td></tr>
+                      <tr><td className="px-4 py-2 text-gray-600 dark:text-gray-400">VAT ({sheet.vat_rate}%)</td><td className="px-4 py-2 text-right">—</td><td className="px-4 py-2 text-right">{fmt(ml.vat_amount)}</td></tr>
+                      <tr className="bg-[#0E8F79]/5 dark:bg-[#0E8F79]/10"><td className="px-4 py-3 text-[#0E8F79] font-bold">Net Selling (VAT Inc)</td><td className="px-4 py-3 text-right">—</td><td className="px-4 py-3 text-right text-[#0E8F79] font-bold text-base">{fmt(ml.net_selling_vat_inc)}</td></tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Government Deductions */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Government Deductions</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      <tr><td className="px-4 py-2">Withholding Tax</td><td className="px-4 py-2 text-right">{ml.withholding_tax_percent}%</td><td className="px-4 py-2 text-right text-red-600">({fmt(ml.withholding_tax_amount)})</td></tr>
+                      <tr><td className="px-4 py-2">Creditable Tax</td><td className="px-4 py-2 text-right">{ml.creditable_tax_percent}%</td><td className="px-4 py-2 text-right text-red-600">({fmt(ml.creditable_tax_amount)})</td></tr>
+                      <tr><td className="px-4 py-2">Warranty Security</td><td className="px-4 py-2 text-right">{ml.warranty_security_percent}%</td><td className="px-4 py-2 text-right text-red-600">({fmt(ml.warranty_security_amount)})</td></tr>
+                    </tbody>
+                    <tfoot className="border-t-2 border-gray-200 dark:border-gray-600 font-bold">
+                      <tr><td className="px-4 py-3">Total Govt Deductions</td><td className="px-4 py-3 text-right">—</td><td className="px-4 py-3 text-right text-red-600">({fmt(ml.total_govt_deduction)})</td></tr>
+                      <tr className="bg-gray-50 dark:bg-gray-700/30"><td className="px-4 py-3">Net Amount Due</td><td className="px-4 py-3 text-right">—</td><td className="px-4 py-3 text-right font-bold">{fmt(ml.net_amount_due)}</td></tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Profitability Analysis */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Profitability Analysis</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { l: 'Net Take Home', v: fmt(ml.net_take_home), c: '' },
+                    { l: 'Earning Before VAT', v: fmt(ml.earning_before_vat), c: Number(ml.earning_before_vat) >= 0 ? 'text-[#3BC25B]' : 'text-red-500' },
+                    { l: 'Output VAT', v: fmt(ml.output_vat), c: '' },
+                    { l: 'Input VAT', v: fmt(ml.input_vat), c: '' },
+                    { l: 'VAT Payable', v: fmt(ml.vat_payable), c: 'text-red-500' },
+                    { l: 'Earning After VAT', v: fmt(ml.earning_after_vat), c: Number(ml.earning_after_vat) >= 0 ? 'text-[#3BC25B]' : 'text-red-500' },
+                    { l: `Commission (${ml.commission_percent}%)`, v: fmt(ml.commission_amount), c: '' },
+                    { l: 'Net Profit', v: fmt(ml.net_profit), c: Number(ml.net_profit) >= 0 ? 'text-[#3BC25B] font-bold' : 'text-red-500 font-bold' },
+                  ].map((item, i) => (
+                    <div key={i} className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                      <p className="text-[10px] text-gray-500 uppercase">{item.l}</p>
+                      <p className={`text-sm font-bold ${item.c || 'text-gray-900 dark:text-white'}`}>{item.v}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 p-4 bg-gradient-to-r from-[#0E8F79]/10 to-[#3BC25B]/10 rounded-lg text-center">
+                  <p className="text-xs text-gray-500 uppercase mb-1">Actual Margin %</p>
+                  <p className={`text-3xl font-bold ${Number(ml.actual_margin_percent) >= 0 ? 'text-[#0E8F79]' : 'text-red-500'}`}>{Number(ml.actual_margin_percent || 0).toFixed(2)}%</p>
+                </div>
+              </div>
+
+              {/* Commission Splits */}
+              {ml.commission_splits?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Commission Splits</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Role</th>
+                          <th className="px-4 py-2 text-right">Share %</th>
+                          <th className="px-4 py-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {ml.commission_splits.map((cs: any, i: number) => (
+                          <tr key={i}>
+                            <td className="px-4 py-2">{cs.role_name}</td>
+                            <td className="px-4 py-2 text-right">{cs.percent}%</td>
+                            <td className="px-4 py-2 text-right font-semibold">{fmt(cs.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="border-t font-bold">
+                        <tr>
+                          <td className="px-4 py-2">Total</td>
+                          <td className="px-4 py-2 text-right">{ml.commission_splits.reduce((s: number, cs: any) => s + Number(cs.percent || 0), 0).toFixed(2)}%</td>
+                          <td className="px-4 py-2 text-right">{fmt(ml.commission_amount)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Side-by-side comparison */}
+              {marginLevels.length > 1 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Margin Level Comparison</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Metric</th>
+                          {marginLevels.map((m: any) => <th key={m.label} className="px-4 py-2 text-right">{MARGIN_DISPLAY[m.label]}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {[
+                          { l: 'Gross Selling (VAT Ex)', f: 'gross_selling_vat_ex' },
+                          { l: 'Net Selling (VAT Inc)', f: 'net_selling_vat_inc' },
+                          { l: 'Net Amount Due', f: 'net_amount_due' },
+                          { l: 'Net Profit', f: 'net_profit' },
+                          { l: 'Actual Margin %', f: 'actual_margin_percent', pct: true },
+                        ].map((row) => (
+                          <tr key={row.f}>
+                            <td className="px-4 py-2 font-medium">{row.l}</td>
+                            {marginLevels.map((m: any) => (
+                              <td key={m.label} className="px-4 py-2 text-right font-semibold">
+                                {row.pct ? `${Number(m[row.f] || 0).toFixed(2)}%` : fmt(m[row.f])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Version History */}
       <Card title="Version History">
@@ -202,22 +378,17 @@ export default function CostingDetail() {
                       <div className="px-4 pb-4 space-y-3">
                         {v.change_summary && <p className="text-sm text-gray-600 dark:text-gray-400 italic">"{v.change_summary}"</p>}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                            <p className="text-[10px] text-gray-500 uppercase">Total Cost</p>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(v.snapshot_data.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                          </div>
-                          <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                            <p className="text-[10px] text-gray-500 uppercase">Selling Price</p>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">₱{Number(v.snapshot_data.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                          </div>
-                          <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                            <p className="text-[10px] text-gray-500 uppercase">Margin</p>
-                            <p className="text-sm font-bold text-[#0E8F79]">{Number(v.snapshot_data.actual_margin_percent || 0).toFixed(2)}%</p>
-                          </div>
-                          <div className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                            <p className="text-[10px] text-gray-500 uppercase">Line Items</p>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">{v.snapshot_data.line_items?.length || 0}</p>
-                          </div>
+                          {[
+                            { l: 'Total Cost', v: fmt(v.snapshot_data.total_cost) },
+                            { l: 'Total Project Cost', v: fmt(v.snapshot_data.total_project_cost) },
+                            { l: 'Line Items', v: v.snapshot_data.line_items?.length || 0 },
+                            { l: 'Version', v: `v${v.version_number}` },
+                          ].map((item, i) => (
+                            <div key={i} className="p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                              <p className="text-[10px] text-gray-500 uppercase">{item.l}</p>
+                              <p className="text-sm font-bold text-gray-900 dark:text-white">{item.v}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

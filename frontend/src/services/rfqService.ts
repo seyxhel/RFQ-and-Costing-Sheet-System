@@ -9,7 +9,8 @@ export const rfqAPI = {
   update: (id: number, d: any) => api.put(`${R}/rfqs/${id}/`, d),
   delete: (id: number) => api.delete(`${R}/rfqs/${id}/`),
   submit: (id: number) => api.post(`${R}/rfqs/${id}/submit/`),
-  approve:(id: number, d: any) => api.post(`${R}/rfqs/${id}/approve/`, d),
+  approve:(id: number, d?: any) => api.post(`${R}/rfqs/${id}/approve/`, d),
+  reject: (id: number, d?: any) => api.post(`${R}/rfqs/${id}/reject/`, d),
   compare:(id: number) => api.get(`${R}/rfqs/${id}/compare/`),
 };
 

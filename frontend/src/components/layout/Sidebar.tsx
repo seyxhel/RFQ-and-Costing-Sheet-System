@@ -14,6 +14,9 @@ import {
   Wallet,
   ShoppingCart,
   BarChart3,
+  Send,
+  Award,
+  FilePieChart,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -48,6 +51,9 @@ export function Sidebar({ currentPath, onNavigate, onExpandChange }: SidebarProp
     { id: 'categories', label: 'Categories', icon: FolderOpen, path: '/products/categories' },
     { id: 'costing', label: 'Costing Sheets', icon: Calculator, path: '/costing', section: 'Costing Module' },
     { id: 'costing-new', label: 'New Costing Sheet', icon: FlaskConical, path: '/costing/new' },
+    { id: 'sales-quotations', label: 'Formal Quotations', icon: Send, path: '/sales/quotations', section: 'Sales Module' },
+    { id: 'sales-orders', label: 'Sales Orders', icon: Award, path: '/sales/orders' },
+    { id: 'contract-analysis', label: 'Contract Analysis', icon: FilePieChart, path: '/sales/contract-analyses' },
     { id: 'budgets', label: 'Budgets', icon: Wallet, path: '/budgets', section: 'Budget & Procurement' },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders' },
     { id: 'variance', label: 'Variance Monitor', icon: BarChart3, path: '/variance' },

@@ -24,6 +24,15 @@ import CostingDetail from './pages/costing/CostingDetail';
 import ScenarioList from './pages/costing/ScenarioList';
 import ScenarioForm from './pages/costing/ScenarioForm';
 
+// Sales module
+import FormalQuotationList from './pages/sales/FormalQuotationList';
+import FormalQuotationForm from './pages/sales/FormalQuotationForm';
+import FormalQuotationDetail from './pages/sales/FormalQuotationDetail';
+import SalesOrderList from './pages/sales/SalesOrderList';
+import SalesOrderForm from './pages/sales/SalesOrderForm';
+import SalesOrderDetail from './pages/sales/SalesOrderDetail';
+import ContractAnalysisList from './pages/sales/ContractAnalysisList';
+
 // Products module
 import ProductList from './pages/products/ProductList';
 import ProductForm from './pages/products/ProductForm';
@@ -104,6 +113,21 @@ function AppRoutes() {
                 <Route path="/costing/:id/edit" element={<CostingForm />} />
                 <Route path="/costing/:sheetId/scenarios" element={<ScenarioList />} />
                 <Route path="/costing/:sheetId/scenarios/new" element={<ScenarioForm />} />
+
+                {/* Sales - Formal Quotations */}
+                <Route path="/sales/quotations" element={<FormalQuotationList />} />
+                <Route path="/sales/quotations/new" element={<FormalQuotationForm />} />
+                <Route path="/sales/quotations/:id" element={<FormalQuotationDetail />} />
+                <Route path="/sales/quotations/:id/edit" element={<FormalQuotationForm />} />
+
+                {/* Sales - Sales Orders */}
+                <Route path="/sales/orders" element={<SalesOrderList />} />
+                <Route path="/sales/orders/new" element={<SalesOrderForm />} />
+                <Route path="/sales/orders/:id" element={<SalesOrderDetail />} />
+                <Route path="/sales/orders/:id/edit" element={<SalesOrderForm />} />
+
+                {/* Sales - Contract Analysis */}
+                <Route path="/sales/contract-analyses" element={<ContractAnalysisList />} />
 
                 {/* Products */}
                 <Route path="/products" element={<ProductList />} />
