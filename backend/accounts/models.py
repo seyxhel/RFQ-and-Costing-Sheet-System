@@ -147,6 +147,14 @@ class AuditLog(models.Model):
     old_status = models.CharField(max_length=30, blank=True, default="")
     new_status = models.CharField(max_length=30, blank=True, default="")
     details = models.JSONField(default=dict, blank=True, help_text="Extra context")
+    reference = models.CharField(
+        max_length=300, blank=True, default="",
+        help_text="Related document/invoice reference, e.g. INV-EF-202603-004",
+    )
+    remarks = models.TextField(
+        blank=True, default="",
+        help_text="Free-text notes for additional context",
+    )
     user = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="audit_logs",
@@ -167,7 +175,7 @@ class AuditLog(models.Model):
 
 def log_action(*, request=None, user=None, module, action, object_type,
                object_id=None, object_repr="", old_status="", new_status="",
-               details=None):
+               details=None, reference="", remarks=""):
     """
     Utility to create an AuditLog entry from anywhere.
 
@@ -200,6 +208,8 @@ def log_action(*, request=None, user=None, module, action, object_type,
         old_status=old_status or "",
         new_status=new_status or "",
         details=details or {},
+        reference=reference or "",
+        remarks=remarks or "",
         user=user,
         ip_address=ip,
     )

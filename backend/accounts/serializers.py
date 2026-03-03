@@ -121,6 +121,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "id", "module", "module_display", "action", "action_display",
             "object_type", "object_id", "object_repr",
             "old_status", "new_status", "details",
+            "reference", "remarks",
             "user", "user_name", "ip_address", "timestamp",
         ]
         read_only_fields = fields

@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FileText, CheckCircle, Clock, Download, ArrowLeft, TrendingUp,
   Truck, Calculator, Send, Award, Wallet, ShoppingCart, AlertTriangle,
-  User, ArrowRight, Search,
+  User, ArrowRight, Search, BarChart3, Link2,
 } from 'lucide-react';
 import { reportAPI } from '../services/userService';
 import { budgetAPI } from '../services/budgetService';
@@ -84,6 +84,10 @@ export default function ProjectReport() {
     rows.push(['EXECUTIVE SUMMARY']);
     rows.push(['Project', s.project_title]);
     rows.push(['Client', s.client_name]);
+    rows.push(['Supplier', s.supplier]);
+    rows.push(['Status', s.status]);
+    rows.push(['Duration', `${s.duration?.start_date || ''} — ${s.duration?.end_date || ''}`]);
+    rows.push(['Summary', s.summary]);
     rows.push(['Total Estimated', s.total_estimated]);
     rows.push(['Total Actual', s.total_actual]);
     rows.push(['Total Variance', s.total_variance]);
@@ -150,6 +154,29 @@ export default function ProjectReport() {
       rows.push(['AUDIT TRAIL']);
       rows.push(['Timestamp', 'Action', 'Object Type', 'Object', 'Old Status', 'New Status', 'User']);
       data.audit_trail.forEach((a: any) => rows.push([a.timestamp, a.action_display, a.object_type, a.object_repr, a.old_status, a.new_status, a.user_name]));
+      rows.push([]);
+    }
+
+    if (data.variance_monitoring) {
+      const vm = data.variance_monitoring;
+      rows.push(['VARIANCE & COST MONITORING']);
+      rows.push(['Total Estimated', vm.total_estimated]);
+      rows.push(['Total Actual', vm.total_actual]);
+      rows.push(['Total Variance', vm.total_variance]);
+      rows.push(['Variance %', vm.variance_percent + '%']);
+      rows.push(['Budget Utilization', vm.budget_utilization + '%']);
+      rows.push([]);
+    }
+
+    if (data.audit_trail_reference?.length) {
+      rows.push(['AUDIT TRAIL REFERENCE (Linked Documents)']);
+      data.audit_trail_reference.forEach((ref: string) => rows.push([ref]));
+      rows.push([]);
+    }
+
+    if (data.remarks) {
+      rows.push(['REMARKS']);
+      rows.push([data.remarks]);
     }
 
     const csv = rows.map((r) => r.map((c) => `"${String(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -218,16 +245,39 @@ export default function ProjectReport() {
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[#0E8F79]" /> Executive Summary
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Top row: Project, Client, Supplier, Duration, Status */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Project</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white">{data.executive_summary.project_title || '—'}</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{data.executive_summary.project_title || '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Client</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white">{data.executive_summary.client_name || '—'}</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{data.executive_summary.client_name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Supplier</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{data.executive_summary.supplier || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {data.executive_summary.duration?.start_date || '—'} → {data.executive_summary.duration?.end_date || '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                <StatusBadge status={data.executive_summary.status || 'DRAFT'} />
               </div>
             </div>
+            {/* Auto-generated summary */}
+            {data.executive_summary.summary && (
+              <div className="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Summary</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{data.executive_summary.summary}</p>
+              </div>
+            )}
+            {/* Financial cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Total Estimated</p>
@@ -485,6 +535,64 @@ export default function ProjectReport() {
                   </tbody>
                 </table>
               </div>
+            </Card>
+          )}
+
+          {/* Variance & Cost Monitoring */}
+          {data.variance_monitoring && (
+            <Card accent>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-[#0E8F79]" /> Variance &amp; Cost Monitoring
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Total Estimated</p>
+                  <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{fmt(data.variance_monitoring.total_estimated)}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+                  <p className="text-xs text-green-600 dark:text-green-400 font-medium">Total Actual</p>
+                  <p className="text-lg font-bold text-green-700 dark:text-green-300">{fmt(data.variance_monitoring.total_actual)}</p>
+                </div>
+                <div className={`p-3 rounded-lg ${Number(data.variance_monitoring.total_variance) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
+                  <p className={`text-xs font-medium ${Number(data.variance_monitoring.total_variance) > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>Variance</p>
+                  <p className={`text-lg font-bold ${Number(data.variance_monitoring.total_variance) > 0 ? 'text-red-700 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{fmt(data.variance_monitoring.total_variance)} ({data.variance_monitoring.variance_percent}%)</p>
+                </div>
+                <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 md:col-span-2">
+                  <p className="text-xs text-violet-600 dark:text-violet-400 font-medium">Budget Utilization</p>
+                  <p className="text-lg font-bold text-violet-700 dark:text-violet-300">{data.variance_monitoring.budget_utilization}%</p>
+                  <div className="mt-2 h-2 rounded-full bg-violet-200 dark:bg-violet-900/40 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#63D44A] to-[#0E8F79] transition-all"
+                         style={{ width: `${Math.min(100, Number(data.variance_monitoring.budget_utilization))}%` }} />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Audit Trail Reference */}
+          {data.audit_trail_reference?.length > 0 && (
+            <Card accent>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-[#0E8F79]" /> Audit Trail Reference
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Linked documents across the procurement lifecycle</p>
+              <div className="flex flex-wrap gap-2">
+                {data.audit_trail_reference.map((ref: string, i: number) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                    <FileText className="w-3 h-3 text-[#0E8F79]" /> {ref}
+                  </span>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Remarks */}
+          {data.remarks && (
+            <Card accent>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#0E8F79]" /> Remarks
+              </h2>
+              <p className="text-sm text-gray-700 dark:text-gray-300">{data.remarks}</p>
             </Card>
           )}
 

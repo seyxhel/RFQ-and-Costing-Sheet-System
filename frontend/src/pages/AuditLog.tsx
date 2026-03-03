@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Filter, Download, Clock, User, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Download, Clock, User, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileText, MessageSquare } from 'lucide-react';
 import { auditLogAPI } from '../services/userService';
 import { Card } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -36,6 +36,7 @@ export default function AuditLog() {
   const [action, setAction] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,12 +59,13 @@ export default function AuditLog() {
   useEffect(() => { load(); }, [load]);
 
   const exportCSV = () => {
-    const rows: string[][] = [['Timestamp', 'Module', 'Action', 'Object Type', 'Object', 'Old Status', 'New Status', 'User', 'IP']];
+    const rows: string[][] = [['Timestamp', 'Module', 'Action', 'Object Type', 'Object', 'Old Status', 'New Status', 'Reference', 'User', 'IP', 'Remarks', 'Details']];
     logs.forEach((l) => {
       rows.push([
         l.timestamp, l.module, l.action_display || l.action,
         l.object_type, l.object_repr, l.old_status, l.new_status,
-        l.user_name, l.ip_address || '',
+        l.reference || '', l.user_name, l.ip_address || '', l.remarks || '',
+        l.details && Object.keys(l.details).length ? JSON.stringify(l.details) : '',
       ]);
     });
     const csv = rows.map((r) => r.map((c) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -131,17 +133,28 @@ export default function AuditLog() {
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                   <tr>
+                    <th className="px-4 py-3 font-semibold w-8"></th>
                     <th className="px-4 py-3 font-semibold">Timestamp</th>
                     <th className="px-4 py-3 font-semibold">Module</th>
                     <th className="px-4 py-3 font-semibold">Action</th>
-                    <th className="px-4 py-3 font-semibold">Object</th>
+                    <th className="px-4 py-3 font-semibold">Entity &amp; Reference</th>
                     <th className="px-4 py-3 font-semibold">Status Change</th>
                     <th className="px-4 py-3 font-semibold">User</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  {logs.map((log) => {
+                    const hasExtra = log.reference || log.remarks || (log.details && Object.keys(log.details).length > 0);
+                    const isExpanded = expandedId === log.id;
+                    return (
+                    <React.Fragment key={log.id}>
+                    <tr onClick={() => hasExtra && setExpandedId(isExpanded ? null : log.id)}
+                        className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${hasExtra ? 'cursor-pointer' : ''}`}>
+                      <td className="px-2 py-3 text-center">
+                        {hasExtra ? (
+                          isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gray-400 mx-auto" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400 mx-auto" />
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                           <Clock className="w-3.5 h-3.5" />
@@ -164,6 +177,11 @@ export default function AuditLog() {
                           {log.object_repr && (
                             <p className="font-medium text-gray-900 dark:text-white text-xs">{log.object_repr}</p>
                           )}
+                          {log.reference && (
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
+                              <FileText className="w-3 h-3" /> {log.reference}
+                            </p>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -182,9 +200,45 @@ export default function AuditLog() {
                           <User className="w-3 h-3" />
                           {log.user_name}
                         </div>
+                        {log.ip_address && (
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500">{log.ip_address}</span>
+                        )}
                       </td>
                     </tr>
-                  ))}
+                    {/* Expandable detail row */}
+                    {isExpanded && hasExtra && (
+                      <tr className="bg-gray-50/50 dark:bg-gray-800/30">
+                        <td colSpan={7} className="px-8 py-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            {log.reference && (
+                              <div>
+                                <span className="font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1"><FileText className="w-3 h-3" /> Reference</span>
+                                <span className="text-gray-900 dark:text-white">{log.reference}</span>
+                              </div>
+                            )}
+                            {log.remarks && (
+                              <div>
+                                <span className="font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1"><MessageSquare className="w-3 h-3" /> Remarks</span>
+                                <span className="text-gray-900 dark:text-white">{log.remarks}</span>
+                              </div>
+                            )}
+                            {log.details && Object.keys(log.details).length > 0 && (
+                              <div className="md:col-span-2">
+                                <span className="font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Details</span>
+                                <div className="bg-white dark:bg-gray-800 rounded p-2 border border-gray-200 dark:border-gray-700 font-mono text-[11px] whitespace-pre-wrap break-all">
+                                  {Object.entries(log.details).map(([k, v]) => (
+                                    <div key={k}><span className="text-gray-400">{k}:</span> <span className="text-gray-900 dark:text-gray-100">{String(v)}</span></div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

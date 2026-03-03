@@ -395,10 +395,97 @@ def project_report_view(request):
                 "details": log.details,
             })
 
+    # ---------- Derive executive summary fields ----------
+
+    project_title = (rfq_data[0]["project_title"] if rfq_data
+                     else budget_data[0]["title"] if budget_data else "")
+    client_name = rfq_data[0]["client_name"] if rfq_data else ""
+
+    # Supplier: derive from winning quotation or PO supplier
+    supplier_names = set()
+    for q in quotation_data:
+        if q.get("status") == "ACCEPTED" and q.get("supplier_name"):
+            supplier_names.add(q["supplier_name"])
+    if not supplier_names:
+        for p in po_data:
+            if p.get("supplier_name"):
+                supplier_names.add(p["supplier_name"])
+    supplier = ", ".join(sorted(supplier_names)) if supplier_names else "—"
+
+    # Duration: earliest created_at → latest updated_at across all objects
+    all_dates = []
+    for r in rfqs:
+        if r.created_at:
+            all_dates.append(r.created_at)
+    for b in budgets:
+        if b.created_at:
+            all_dates.append(b.created_at)
+        if b.approved_at:
+            all_dates.append(b.approved_at)
+    for p in pos:
+        if p.created_at:
+            all_dates.append(p.created_at)
+        if p.actual_delivery:
+            all_dates.append(p.actual_delivery) if False else None  # date, not datetime
+    start_date = min(all_dates).date().isoformat() if all_dates else ""
+    end_date = max(all_dates).date().isoformat() if all_dates else ""
+
+    # Project status: derive from budget status or PO status
+    if budget_data:
+        statuses = [b["status"] for b in budget_data]
+        if all(s == "CLOSED" for s in statuses):
+            project_status = "Closed"
+        elif any(s == "APPROVED" for s in statuses):
+            project_status = "Active"
+        else:
+            project_status = "Draft"
+    elif po_data:
+        if all(p["status"] == "COMPLETED" for p in po_data):
+            project_status = "Completed"
+        else:
+            project_status = "In Progress"
+    else:
+        project_status = "Pending"
+
+    # Auto-generated executive summary text
+    utilization = round((total_actual / total_estimated * 100), 1) if total_estimated else 0
+    variance_sign = "over" if total_variance > 0 else "under" if total_variance < 0 else "at"
+    exec_text = (
+        f"Project \"{project_title}\" for {client_name or 'N/A'} "
+        f"with supplier(s) {supplier}. "
+        f"Status: {project_status}. "
+        f"Total estimated cost: ₱{total_estimated:,.2f}, "
+        f"actual: ₱{total_actual:,.2f} "
+        f"({variance_sign} budget by ₱{abs(total_variance):,.2f}, "
+        f"{abs(utilization - 100):.1f}% variance). "
+        f"Budget utilization: {utilization}%."
+    )
+
+    # Audit trail reference: flat list of linked document numbers
+    audit_trail_reference = []
+    for r in rfq_data:
+        audit_trail_reference.append(r["rfq_number"])
+    for q in quotation_data:
+        audit_trail_reference.append(q["quotation_number"])
+    for cs in costing_data:
+        audit_trail_reference.append(cs["sheet_number"])
+    for fq in formal_quotes:
+        audit_trail_reference.append(fq["quotation_number"])
+    for so in sales_orders:
+        audit_trail_reference.append(so["so_number"])
+    for b in budget_data:
+        audit_trail_reference.append(b["budget_number"])
+    for p in po_data:
+        audit_trail_reference.append(p["po_number"])
+
     return Response({
         "executive_summary": {
-            "project_title": rfq_data[0]["project_title"] if rfq_data else (budget_data[0]["title"] if budget_data else ""),
-            "client_name": rfq_data[0]["client_name"] if rfq_data else "",
+            "project_title": project_title,
+            "client_name": client_name,
+            "supplier": supplier,
+            "duration": {"start_date": start_date, "end_date": end_date},
+            "status": project_status,
+            "summary": exec_text,
             "total_estimated": str(round(total_estimated, 2)),
             "total_actual": str(round(total_actual, 2)),
             "total_variance": str(round(total_variance, 2)),
@@ -412,5 +499,14 @@ def project_report_view(request):
         "contract_analyses": contract_analyses,
         "budgets": budget_data,
         "purchase_orders": po_data,
+        "variance_monitoring": {
+            "total_estimated": str(round(total_estimated, 2)),
+            "total_actual": str(round(total_actual, 2)),
+            "total_variance": str(round(total_variance, 2)),
+            "variance_percent": str(round((total_variance / total_estimated * 100), 1) if total_estimated else 0),
+            "budget_utilization": str(utilization),
+        },
+        "audit_trail_reference": audit_trail_reference,
         "audit_trail": audit_trail,
+        "remarks": "",
     })
