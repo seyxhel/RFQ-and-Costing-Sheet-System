@@ -26,17 +26,17 @@ export default function QuotationList() {
   useEffect(() => { const h = () => setOpenMenuId(null); document.addEventListener('click', h); return () => document.removeEventListener('click', h); }, []);
 
   const handleDelete = (id: number) => {
-    quotationAPI.delete(id).then(() => { setQuotations((p) => p.filter((q) => q.id !== id)); toast.success('Quotation deleted'); }).catch(() => toast.error('Delete failed'));
+    quotationAPI.delete(id).then(() => { setQuotations((p) => p.filter((q) => q.id !== id)); toast.success('Canvass entry deleted'); }).catch(() => toast.error('Delete failed'));
     setOpenMenuId(null);
   };
 
   const handleAccept = (id: number) => {
-    quotationAPI.accept(id).then(() => { toast.success('Quotation accepted!'); loadQuotations(); }).catch(() => toast.error('Failed to accept'));
+    quotationAPI.accept(id).then(() => { toast.success('Canvass entry accepted!'); loadQuotations(); }).catch(() => toast.error('Failed to accept'));
     setOpenMenuId(null);
   };
 
   const handleReject = (id: number) => {
-    quotationAPI.reject(id).then(() => { toast.success('Quotation rejected'); loadQuotations(); }).catch(() => toast.error('Failed to reject'));
+    quotationAPI.reject(id).then(() => { toast.success('Canvass entry rejected'); loadQuotations(); }).catch(() => toast.error('Failed to reject'));
     setOpenMenuId(null);
   };
 
@@ -56,10 +56,10 @@ export default function QuotationList() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quotations</h1>
-          <p className="text-gray-500 dark:text-gray-400">Supplier quotes for RFQs</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Supplier Canvass</h1>
+          <p className="text-gray-500 dark:text-gray-400">Canvass sheets from suppliers</p>
         </div>
-        <GreenButton onClick={() => navigate('/quotations/new')}><Plus className="w-4 h-4 mr-2" /> New Quotation</GreenButton>
+        <GreenButton onClick={() => navigate('/quotations/new')}><Plus className="w-4 h-4 mr-2" /> New Canvass Entry</GreenButton>
       </div>
 
       <Card accent>
@@ -88,7 +88,7 @@ export default function QuotationList() {
               {loading ? (
                 <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr>
               ) : pageData.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-12 text-center"><div className="flex flex-col items-center gap-2 text-gray-400"><ClipboardList className="w-8 h-8" /><p>No quotations found</p></div></td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center"><div className="flex flex-col items-center gap-2 text-gray-400"><ClipboardList className="w-8 h-8" /><p>No canvass entries found</p></div></td></tr>
               ) : pageData.map((q) => (
                 <tr key={q.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">#{q.id}</td>

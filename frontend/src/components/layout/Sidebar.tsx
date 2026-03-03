@@ -48,7 +48,7 @@ export function Sidebar({ currentPath, onNavigate, onExpandChange }: SidebarProp
     { id: 'rfq', label: 'RFQ List', icon: FileText, path: '/rfq', section: 'RFQ Module' },
     { id: 'rfq-new', label: 'New RFQ', icon: ClipboardList, path: '/rfq/new' },
     { id: 'suppliers', label: 'Suppliers', icon: Truck, path: '/suppliers' },
-    { id: 'quotations', label: 'Quotations', icon: FileText, path: '/quotations' },
+    { id: 'quotations', label: 'Supplier Canvass', icon: FileText, path: '/quotations' },
     { id: 'products', label: 'Product Catalog', icon: Package, path: '/products', section: 'Products' },
     { id: 'categories', label: 'Categories', icon: FolderOpen, path: '/products/categories' },
     { id: 'costing', label: 'Costing Sheets', icon: Calculator, path: '/costing', section: 'Costing Module' },

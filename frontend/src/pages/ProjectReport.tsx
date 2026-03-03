@@ -102,8 +102,8 @@ export default function ProjectReport() {
     }
 
     if (data.quotations?.length) {
-      rows.push(['SUPPLIER QUOTATIONS']);
-      rows.push(['Quotation #', 'Supplier', 'Status', 'Total']);
+      rows.push(['SUPPLIER CANVASS']);
+      rows.push(['Canvass #', 'Supplier', 'Status', 'Total']);
       data.quotations.forEach((q: any) => rows.push([q.quotation_number, q.supplier_name, q.status, q.total_amount]));
       rows.push([]);
     }
@@ -331,13 +331,13 @@ export default function ProjectReport() {
           {data.quotations?.length > 0 && (
             <Card accent>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <Truck className="w-5 h-5 text-[#0E8F79]" /> Supplier Quotations
+                <Truck className="w-5 h-5 text-[#0E8F79]" /> Supplier Canvass
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
                     <tr>
-                      <th className="px-4 py-3">Quotation #</th><th className="px-4 py-3">Supplier</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3">Canvass #</th><th className="px-4 py-3">Supplier</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">

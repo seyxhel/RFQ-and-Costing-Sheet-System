@@ -83,8 +83,8 @@ export default function QuotationForm() {
     setSaving(true);
     try {
       const payload = { ...form, items: lineItems };
-      if (isEdit) { await quotationAPI.update(Number(id), payload); toast.success('Quotation updated'); }
-      else { await quotationAPI.create(payload); toast.success('Quotation created'); }
+      if (isEdit) { await quotationAPI.update(Number(id), payload); toast.success('Canvass entry updated'); }
+      else { await quotationAPI.create(payload); toast.success('Canvass entry created'); }
       navigate('/quotations');
     } catch { toast.error('Failed to save'); }
     finally { setSaving(false); }
@@ -97,14 +97,14 @@ export default function QuotationForm() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Quotation' : 'New Quotation'}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Canvass Entry' : 'New Canvass Entry'}</h1>
           <p className="text-gray-500 dark:text-gray-400">Supplier response with canvass matrix fields</p>
         </div>
         <GreenButton variant="outline" onClick={() => navigate('/quotations')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card accent title="Quotation Details">
+        <Card accent title="Canvass Details">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">RFQ <span className="text-red-500">*</span></label>
@@ -139,7 +139,7 @@ export default function QuotationForm() {
           </div>
         </Card>
 
-        <Card accent title="Quotation Items (Canvass Matrix)">
+        <Card accent title="Canvass Items">
           {rfqLineItems.length === 0 && form.rfq && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">No line items found in this RFQ. Add items manually below.</p>
           )}
@@ -301,7 +301,7 @@ export default function QuotationForm() {
         </Card>
 
         <div className="flex gap-3">
-          <GreenButton type="submit" isLoading={saving}>{isEdit ? 'Update Quotation' : 'Create Quotation'}</GreenButton>
+          <GreenButton type="submit" isLoading={saving}>{isEdit ? 'Update Canvass' : 'Create Canvass'}</GreenButton>
           <GreenButton type="button" variant="outline" onClick={() => navigate('/quotations')}>Cancel</GreenButton>
         </div>
       </form>

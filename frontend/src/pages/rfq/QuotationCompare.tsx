@@ -35,17 +35,17 @@ export default function QuotationCompare() {
     setAccepting(quotationId);
     try {
       await quotationAPI.accept(quotationId);
-      toast.success('Quotation accepted! Other quotations have been rejected.');
+      toast.success('Canvass entry accepted! Others have been auto-rejected.');
       reload();
-    } catch { toast.error('Failed to accept quotation'); } finally { setAccepting(null); }
+    } catch { toast.error('Failed to accept canvass entry'); } finally { setAccepting(null); }
   };
 
   const handleReject = async (quotationId: number) => {
     try {
       await quotationAPI.reject(quotationId);
-      toast.success('Quotation rejected');
+      toast.success('Canvass entry rejected');
       reload();
-    } catch { toast.error('Failed to reject quotation'); }
+    } catch { toast.error('Failed to reject canvass entry'); }
   };
 
   const toggleRow = (itemId: number) => {
@@ -82,12 +82,12 @@ export default function QuotationCompare() {
     rows.push(`Issue Date,${esc(rfqData.issue_date)}`);
     rows.push(`Deadline,${esc(rfqData.deadline || 'N/A')}`);
     rows.push(`Total Items,${rfqData.item_count}`);
-    rows.push(`Total Quotations,${rfqData.quotation_count}`);
+    rows.push(`Total Canvass Entries,${rfqData.quotation_count}`);
     rows.push('');
 
     // --- Section 2: Supplier Summary ---
     rows.push('SUPPLIER SUMMARY');
-    rows.push(['Supplier', 'Quotation #', 'Status', 'Total Amount', 'Currency', 'Lead Time (days)', 'Payment Terms', 'Validity (days)', 'Rating'].map(esc).join(','));
+    rows.push(['Supplier', 'Canvass #', 'Status', 'Total Amount', 'Currency', 'Lead Time (days)', 'Payment Terms', 'Validity (days)', 'Rating'].map(esc).join(','));
     quots.forEach((q: any) => {
       rows.push([
         q.supplier_name, q.quotation_number || `#${q.id}`, q.status,
@@ -211,7 +211,7 @@ export default function QuotationCompare() {
           </div>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-purple-500/10"><Package className="w-5 h-5 text-purple-500" /></div>
-            <div><p className="text-[10px] text-gray-500 uppercase font-semibold">Items / Quotes</p><p className="text-sm font-bold text-gray-900 dark:text-white">{rfq.item_count} items &middot; {rfq.quotation_count} quote{rfq.quotation_count !== 1 ? 's' : ''}</p></div>
+            <div><p className="text-[10px] text-gray-500 uppercase font-semibold">Items / Canvass</p><p className="text-sm font-bold text-gray-900 dark:text-white">{rfq.item_count} items &middot; {rfq.quotation_count} canvass entr{rfq.quotation_count !== 1 ? 'ies' : 'y'}</p></div>
           </div>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-orange-500/10"><Calendar className="w-5 h-5 text-orange-500" /></div>
@@ -366,7 +366,7 @@ export default function QuotationCompare() {
                                     <p className="text-[11px] text-gray-400 mt-1">Line total: ₱{fmt(pe.amount)}</p>
                                   </div>
                                 ) : (
-                                  <span className="text-gray-400 italic text-xs">No quote</span>
+                                  <span className="text-gray-400 italic text-xs">No canvass</span>
                                 )}
                               </td>
                             );
