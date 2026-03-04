@@ -17,6 +17,8 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True, default="")
+    rfq_number = serializers.CharField(source="rfq.rfq_number", read_only=True, default="")
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True, default="")
 
     class Meta:
         model = Product
@@ -24,7 +26,10 @@ class ProductSerializer(serializers.ModelSerializer):
             "id", "sku", "name", "description",
             "category", "category_name",
             "unit", "specifications",
-            "estimated_unit_cost", "is_active",
+            "estimated_unit_cost",
+            "rfq", "rfq_number",
+            "supplier", "supplier_name",
+            "is_active",
             "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]

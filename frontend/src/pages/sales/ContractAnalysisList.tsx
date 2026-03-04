@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contractAnalysisAPI, salesOrderAPI } from '../../services/salesService';
 import { toast } from 'sonner';
-import { Search, Plus, Save, X, RefreshCw } from 'lucide-react';
+import { Search, Plus, Save, X, RefreshCw, Pencil, Trash2 } from 'lucide-react';
 
 export default function ContractAnalysisList() {
   const nav = useNavigate();
@@ -10,12 +10,19 @@ export default function ContractAnalysisList() {
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     sales_order: '', name: '', contract_price: 0,
     warranty_security: 0, ewt_amount: 0, lgu_amount: 0,
     facilitation: 0, cogs: 0, implementation: 0, net_benefit: 0, notes: '',
   });
   const [saving, setSaving] = useState(false);
+
+  const defaultForm = {
+    sales_order: '', name: '', contract_price: 0,
+    warranty_security: 0, ewt_amount: 0, lgu_amount: 0,
+    facilitation: 0, cogs: 0, implementation: 0, net_benefit: 0, notes: '',
+  };
 
   const load = async () => {
     try {
@@ -35,20 +42,56 @@ export default function ContractAnalysisList() {
 
   const setField = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }));
 
+  const startEdit = (ca: any) => {
+    setEditingId(ca.id);
+    setForm({
+      sales_order: String(ca.sales_order),
+      name: ca.name || '',
+      contract_price: ca.contract_price || 0,
+      warranty_security: ca.warranty_security || 0,
+      ewt_amount: ca.ewt_amount || 0,
+      lgu_amount: ca.lgu_amount || 0,
+      facilitation: ca.facilitation || 0,
+      cogs: ca.cogs || 0,
+      implementation: ca.implementation || 0,
+      net_benefit: ca.net_benefit || 0,
+      notes: ca.notes || '',
+    });
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(defaultForm);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await contractAnalysisAPI.create({
-        ...form,
-        sales_order: Number(form.sales_order),
-      });
-      toast.success('Contract analysis created');
-      setShowForm(false);
+      const payload = { ...form, sales_order: Number(form.sales_order) };
+      if (editingId) {
+        await contractAnalysisAPI.update(editingId, payload);
+        toast.success('Contract analysis updated');
+      } else {
+        await contractAnalysisAPI.create(payload);
+        toast.success('Contract analysis created');
+      }
+      cancelForm();
       load();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Save failed');
     } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Delete this contract analysis?')) return;
+    try {
+      await contractAnalysisAPI.delete(id);
+      setItems(p => p.filter(r => r.id !== id));
+      toast.success('Contract analysis deleted');
+    } catch { toast.error('Failed to delete'); }
   };
 
   const recalc = async (id: number) => {
@@ -74,8 +117,8 @@ export default function ContractAnalysisList() {
       {showForm && (
         <form onSubmit={submit} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create Contract Analysis</h2>
-            <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{editingId ? 'Edit Contract Analysis' : 'Create Contract Analysis'}</h2>
+            <button type="button" onClick={cancelForm} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -98,9 +141,9 @@ export default function ContractAnalysisList() {
           </div>
           <div><label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notes</label><textarea value={form.notes} onChange={e => setField('notes', e.target.value)} className={inp} rows={2} /></div>
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">Cancel</button>
+            <button type="button" onClick={cancelForm} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">Cancel</button>
             <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#63D44A] to-[#0E8F79] text-white rounded-lg text-sm disabled:opacity-50">
-              <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save'}
+              <Save className="w-4 h-4" /> {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
             </button>
           </div>
         </form>
@@ -134,7 +177,11 @@ export default function ContractAnalysisList() {
                   <td className="px-4 py-3 text-right font-mono">{ca.net_cash_flow_percent}%</td>
                   <td className="px-4 py-3 text-right font-mono">{fmt(ca.vat_payable)}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => recalc(ca.id)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Recalculate"><RefreshCw className="w-4 h-4" /></button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => startEdit(ca)} className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400" title="Edit"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => recalc(ca.id)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Recalculate"><RefreshCw className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete(ca.id)} className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -98,6 +98,8 @@ export default function ProductList() {
                 <th className="px-6 py-4 font-semibold">SKU</th>
                 <th className="px-6 py-4 font-semibold">Product Name</th>
                 <th className="px-6 py-4 font-semibold">Category</th>
+                <th className="px-6 py-4 font-semibold">RFQ</th>
+                <th className="px-6 py-4 font-semibold">Supplier</th>
                 <th className="px-6 py-4 font-semibold">Unit</th>
                 <th className="px-6 py-4 font-semibold">Est. Cost</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
@@ -106,9 +108,9 @@ export default function ProductList() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr>
+                <tr><td colSpan={9} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr>
               ) : paged.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                <tr><td colSpan={9} className="px-6 py-12 text-center text-gray-400">
                   <Package className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                   No products found.
                 </td></tr>
@@ -119,6 +121,8 @@ export default function ProductList() {
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{product.name}</td>
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">{product.category_name || '—'}</td>
+                  <td className="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">{product.rfq_number || '—'}</td>
+                  <td className="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">{product.supplier_name || '—'}</td>
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{product.unit}</td>
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                     {product.estimated_unit_cost ? `₱${Number(product.estimated_unit_cost).toLocaleString()}` : '—'}

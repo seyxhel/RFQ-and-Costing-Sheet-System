@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { salesOrderAPI } from '../../services/salesService';
 import { toast } from 'sonner';
-import { Plus, Search, Eye } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
@@ -17,6 +18,9 @@ export default function SalesOrderList() {
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const btnRefs = useRef<Record<number, HTMLButtonElement | null>>({});
 
   const load = async () => {
     try {
@@ -27,6 +31,31 @@ export default function SalesOrderList() {
   };
 
   useEffect(() => { load(); }, [search]);
+
+  useEffect(() => {
+    const handler = () => setOpenMenuId(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
+  const openMenu = useCallback((id: number) => {
+    const btn = btnRefs.current[id];
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.right - 140 });
+    }
+    setOpenMenuId(prev => (prev === id ? null : id));
+  }, []);
+
+  const handleDelete = async (id: number) => {
+    setOpenMenuId(null);
+    if (!window.confirm('Delete this sales order?')) return;
+    try {
+      await salesOrderAPI.delete(id);
+      setItems(p => p.filter(r => r.id !== id));
+      toast.success('Sales order deleted');
+    } catch { toast.error('Failed to delete'); }
+  };
 
   const fmt = (n: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n);
 
@@ -57,7 +86,7 @@ export default function SalesOrderList() {
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-right">Contract Amount</th>
                 <th className="px-4 py-3 text-left">Awarded</th>
-                <th className="px-4 py-3" />
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -70,7 +99,9 @@ export default function SalesOrderList() {
                   <td className="px-4 py-3 text-right font-mono text-gray-900 dark:text-white">{fmt(so.contract_amount)}</td>
                   <td className="px-4 py-3 text-gray-500">{so.awarded_date || '—'}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => nav(`/sales/orders/${so.id}`)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><Eye className="w-4 h-4" /></button>
+                    <button ref={el => { btnRefs.current[so.id] = el; }} onClick={e => { e.stopPropagation(); openMenu(so.id); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -80,6 +111,21 @@ export default function SalesOrderList() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {openMenuId !== null && ReactDOM.createPortal(
+        <div style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 9999 }} className="w-36 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1" onClick={e => e.stopPropagation()}>
+          <button onClick={() => { nav(`/sales/orders/${openMenuId}`); setOpenMenuId(null); }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <Eye className="w-4 h-4" /> View
+          </button>
+          <button onClick={() => { nav(`/sales/orders/${openMenuId}/edit`); setOpenMenuId(null); }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <Pencil className="w-4 h-4" /> Edit
+          </button>
+          <button onClick={() => handleDelete(openMenuId)} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
+        </div>,
+        document.body,
       )}
     </div>
   );
