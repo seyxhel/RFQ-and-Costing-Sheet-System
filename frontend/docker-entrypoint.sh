@@ -4,11 +4,10 @@ set -e
 # Substitute environment variables in nginx config
 export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 
-# Extract IPv4 DNS resolver from /etc/resolv.conf (skip IPv6 — nginx can't use them with ipv6=off)
-export DNS_RESOLVER=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-if [ -z "$DNS_RESOLVER" ]; then
-    export DNS_RESOLVER="8.8.8.8"
-fi
+# Use Docker/Railway embedded DNS resolver for internal service discovery
+# 127.0.0.11 is Docker's built-in DNS that resolves both internal names
+# (e.g. *.railway.internal) and external names
+export DNS_RESOLVER="127.0.0.11"
 
 # Use envsubst to replace variables in nginx config
 envsubst '${BACKEND_URL} ${DNS_RESOLVER}' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp
