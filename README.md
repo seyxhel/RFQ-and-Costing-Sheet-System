@@ -1,6 +1,6 @@
 # Business Internal System — RFQ, Costing & Sales
 
-A full-stack internal business system built with **React + TypeScript + Tailwind CSS** (frontend) and **Django + Django REST Framework** (backend). Covers the complete **Sales & Purchasing workflow**: Supplier canvassing, RFQ management, **PH-tax-aware costing sheets** with 3 margin levels, formal quotations, sales orders, contract analysis, budgets, and procurement variance monitoring — all with RBAC security, multi-level approvals, version history, and configurable cost/commission categories.
+A full-stack internal business system built with **React + TypeScript + Tailwind CSS** (frontend) and **Django + Django REST Framework** (backend). Covers the complete **Sales & Purchasing workflow**: Supplier canvassing, RFQ management, **PH-tax-aware costing sheets** with 3 margin levels, formal quotations, sales orders, contract analysis, budgets, and procurement variance monitoring — all with RBAC security, multi-level approvals, version history, audit logging, project reports, and configurable cost/commission categories.
 
 ---
 
@@ -13,12 +13,13 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 5. [Frontend Setup (Vite + React)](#frontend-setup-vite--react)
 6. [Default Credentials](#default-credentials)
 7. [Database: SQLite → PostgreSQL Migration](#database-sqlite--postgresql-migration)
-8. [API Endpoints Reference](#api-endpoints-reference)
-9. [Security Features](#security-features)
-10. [Module Details](#module-details)
-11. [PH-Tax-Aware Costing Formula](#ph-tax-aware-costing-formula)
-12. [Seeded Configuration Data](#seeded-configuration-data)
-13. [Complete Workflow](#complete-workflow)
+8. [Docker Deployment](#docker-deployment)
+9. [API Endpoints Reference](#api-endpoints-reference)
+10. [Security Features](#security-features)
+11. [Module Details](#module-details)
+12. [PH-Tax-Aware Costing Formula](#ph-tax-aware-costing-formula)
+13. [Seeded Configuration Data](#seeded-configuration-data)
+14. [Complete Workflow](#complete-workflow)
 
 ---
 
@@ -29,14 +30,14 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 │                  React + TypeScript Frontend                         │
 │  Vite 5 · Tailwind CSS 3.4 · Recharts · Lucide Icons · Sonner      │
 │  (Dashboard, RFQ, Costing, Sales, Products, Budget, Procurement,    │
-│   Variance Monitor, Settings, Cost Categories & Commission CRUD)    │
+│   Variance Monitor, Audit Log, Project Report, Settings)            │
 │                     http://localhost:3000                            │
 └──────────────────────────┬───────────────────────────────────────────┘
                            │  REST API (JSON + CSRF)
                            ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                     Django Backend (DRF)                              │
-│   /api/v1/accounts/     — Authentication & User Management           │
+│   /api/v1/accounts/     — Auth, Users, Audit Logs, Project Reports   │
 │   /api/v1/products/     — Product Catalog & Categories               │
 │   /api/v1/rfq/          — RFQ, Suppliers, Quotations (Canvass)       │
 │   /api/v1/costing/      — Costing Sheets, Margins, Scenarios         │
@@ -48,7 +49,7 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
                            │  Django ORM
                            ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│             SQLite (dev) / PostgreSQL (production)                    │
+│             SQLite (dev) / PostgreSQL (production / Docker)           │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -70,21 +71,29 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 ## Project Structure
 
 ```
+├── docker-compose.yml                  # 3-service stack (Postgres + Backend + Frontend)
 ├── backend/                            # Django project root
 │   ├── manage.py                       # Django management commands
 │   ├── requirements.txt                # Python dependencies
+│   ├── Dockerfile                      # Python 3.12 + Gunicorn
+│   ├── start.sh                        # Migration + seed + Gunicorn launcher
+│   ├── .env.example                    # Environment variable template
+│   ├── .dockerignore
 │   ├── core/                           # Django project settings
 │   │   ├── settings.py                 # DB, DRF, CORS, CSRF, Auth config
 │   │   ├── urls.py                     # Root URL routing (7 API modules)
 │   │   └── wsgi.py                     # WSGI entry point
-│   ├── accounts/                       # User management & RBAC
-│   │   ├── models.py                   # Custom User (5 roles), Attachment (GenericFK)
-│   │   ├── serializers.py              # User, Login, Profile, Password serializers
-│   │   ├── views.py                    # Login/logout/me, user CRUD
-│   │   ├── permissions.py              # IsAdminRole, CanApprove, etc.
+│   ├── accounts/                       # User management, RBAC & Audit
+│   │   ├── models.py                   # Custom User (5 roles), Attachment (GenericFK),
+│   │   │                               #   AuditLog (system-wide activity trail)
+│   │   ├── serializers.py              # User, Login, Profile, Password, AuditLog serializers
+│   │   ├── views.py                    # Login/logout/me, user CRUD, audit logs, project report
+│   │   ├── permissions.py              # IsAdminRole, IsManagerOrAbove, CanApprove,
+│   │   │                               #   CanEditFinancial, IsOwnerOrAdmin
 │   │   └── encryption.py              # AES-256 field encryption utility
 │   ├── products/                       # Product Catalog
-│   │   └── models.py                   # Category, Product (SKU, unit, specs)
+│   │   └── models.py                   # Category, Product (SKU, unit, specs,
+│   │                                   #   optional RFQ & Supplier links)
 │   ├── rfq/                            # RFQ & Supplier Canvassing
 │   │   └── models.py                   # Supplier, RFQ, RFQItem, Quotation,
 │   │                                   #   QuotationItem (VAT calc, canvass fields),
@@ -95,7 +104,7 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 │   │                                   #   CostingMarginLevel (LOW/MED/HIGH),
 │   │                                   #   CostingCommissionSplit,
 │   │                                   #   CostingVersion, Scenario
-│   ├── sales/                          # Sales Module (NEW)
+│   ├── sales/                          # Sales Module
 │   │   └── models.py                   # FormalQuotation, FormalQuotationItem,
 │   │                                   #   SalesOrder, ContractAnalysis
 │   ├── budget/                         # Budget Management
@@ -106,8 +115,11 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
 └── frontend/                           # Vite + React + TypeScript
     ├── package.json
     ├── vite.config.ts                  # Port 3000, proxy /api → localhost:8000
+    ├── Dockerfile                      # Node 20 build + Nginx serve
+    ├── nginx.conf                      # Reverse-proxy to backend + SPA fallback
+    ├── .dockerignore
     └── src/
-        ├── App.tsx                     # 40+ routes
+        ├── App.tsx                     # 40+ routes (ProtectedRoute + AdminRoute)
         ├── context/
         │   ├── AuthContext.tsx          # Session auth state (login/logout/roles)
         │   └── ThemeContext.tsx         # Dark mode (localStorage + OS preference)
@@ -119,7 +131,7 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
         │   ├── productService.ts       # Products & Categories
         │   ├── budgetService.ts        # Budget APIs
         │   ├── procurementService.ts   # PO & Actual Cost APIs
-        │   └── userService.ts          # User management APIs
+        │   └── userService.ts          # User management, Audit Log & Report APIs
         ├── components/
         │   ├── layout/                 # Layout, Sidebar (collapsible), TopNav
         │   └── ui/                     # Card, GreenButton, StatCard, StatusBadge
@@ -128,6 +140,8 @@ A full-stack internal business system built with **React + TypeScript + Tailwind
             ├── Login.tsx               # Session-based login
             ├── Settings.tsx            # Profile, password, dark mode,
             │                           #   Cost Categories CRUD, Commission Roles CRUD
+            ├── AuditLog.tsx            # System-wide activity log with filters & CSV export
+            ├── ProjectReport.tsx       # Project lifecycle report with executive summary
             ├── rfq/                    # RFQ List/Form/Detail, Suppliers, Quotations, Compare
             ├── costing/                # Costing List/Form/Detail (3 margins), Scenarios
             ├── sales/                  # Formal Quotation List/Form/Detail,
@@ -270,6 +284,50 @@ No model changes needed. The Django ORM handles the translation.
 
 ---
 
+## Docker Deployment
+
+The project includes a full **3-service Docker Compose** setup for production-like local testing.
+
+### Services
+
+| Service | Image | Port | Description |
+|---------|-------|------|-------------|
+| **postgres** | `postgres:16-alpine` | 5432 | PostgreSQL database |
+| **backend** | Custom (Python 3.12 + Gunicorn) | 8000 | Django API server |
+| **frontend** | Custom (Node 20 build + Nginx) | 8080 | React production build |
+
+### Quick Start
+
+```bash
+docker-compose up --build
+```
+
+- Frontend: `http://localhost:8080`
+- Backend API: `http://localhost:8000/api/v1/`
+- Default login: `admin` / `admin`
+
+### How It Works
+
+1. **Backend (`start.sh`)**: Runs migrations (auto-drops all tables and retries from scratch if migrations fail), creates default admin user, collects static files, starts Gunicorn with 3 workers
+2. **Frontend (`Dockerfile`)**: Multi-stage build — Node 20 builds the Vite app, then Nginx serves the static files with reverse-proxy to the backend
+3. **PostgreSQL**: Data persisted via named Docker volume (`pgdata`)
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | (SQLite) | PostgreSQL connection string |
+| `DJANGO_SECRET_KEY` | (dev key) | Django secret key |
+| `DJANGO_DEBUG` | `True` | Debug mode |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Allowed host headers |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | CORS whitelist |
+| `CSRF_TRUSTED_ORIGINS` | `http://localhost:3000` | CSRF trusted origins |
+| `FIELD_ENCRYPTION_KEY` | (empty) | AES-256 Fernet key for field encryption |
+
+See `backend/.env.example` for the full template.
+
+---
+
 ## API Endpoints Reference
 
 ### Accounts (`/api/v1/accounts/`)
@@ -282,6 +340,8 @@ No model changes needed. The Django ORM handles the translation.
 | POST | `/change-password/` | Change own password | Yes |
 | GET/POST | `/users/` | List / Create users | Admin |
 | GET/PUT/DELETE | `/users/{id}/` | User detail / update / delete | Admin |
+| GET | `/audit-logs/` | System-wide audit trail (filterable by module, action, user) | Yes |
+| GET | `/reports/project/` | Project lifecycle report (Budget/RFQ/PO anchor) | Yes |
 
 ### Products (`/api/v1/products/`)
 | Method | Endpoint | Description |
@@ -351,7 +411,10 @@ No model changes needed. The Django ORM handles the translation.
 |--------|----------|-------------|
 | GET/POST | `/budgets/` | List / Create budgets |
 | GET/PUT/DELETE | `/budgets/{id}/` | Budget CRUD |
+| POST | `/budgets/{id}/submit/` | DRAFT → PENDING |
 | POST | `/budgets/{id}/approve/` | PENDING → APPROVED |
+| POST | `/budgets/{id}/reject/` | PENDING → REJECTED |
+| POST | `/budgets/{id}/close/` | APPROVED → CLOSED |
 | POST | `/budgets/{id}/recalculate/` | Recalculate from PO actuals |
 
 ### Procurement Module (`/api/v1/procurement/`)
@@ -376,7 +439,7 @@ No model changes needed. The Django ORM handles the translation.
 | **Field encryption** | AES-256 via `cryptography` library (Fernet) |
 | **HTTPS/TLS** | Auto-enabled when `DEBUG=False` (HSTS, secure cookies) |
 | **CORS** | Restricted to allowed origins via `django-cors-headers` |
-| **Permission classes** | `IsAdminRole`, `CanApprove`, `CanEditFinancial`, `IsOwner` |
+| **Permission classes** | `IsAdminRole`, `IsManagerOrAbove`, `CanApprove`, `CanEditFinancial`, `IsOwnerOrAdmin` |
 | **File uploads** | Local Django media storage (`MEDIA_ROOT`) |
 
 ### Role Permissions Matrix
@@ -446,9 +509,10 @@ No model changes needed. The Django ORM handles the translation.
 
 ### Product Catalog Module
 - **Product categories** — create and manage product categories with active/inactive toggle
-- **Product CRUD** — name, SKU, description, unit, estimated unit cost, specifications, category
+- **Product CRUD** — name, SKU (auto-generated `PRD-00001`), description, unit, estimated unit cost, specifications, category
+- **RFQ & Supplier linking** — optionally link a product to a specific RFQ and supplier for project-based procurement tracking
 - **Product picker** — integrated into RFQ item creation for standardized references
-- **Search & filter** — filter by category, search by name/SKU
+- **Search & filter** — filter by category, RFQ, or supplier; search by name/SKU/description/specifications
 
 ### Budget Module
 - **Create budgets** with title, description, allocated amount, and linked RFQ / costing sheet / sales order
@@ -463,7 +527,7 @@ No model changes needed. The Django ORM handles the translation.
   - Line items with product reference, quantity, unit cost
   - Estimated total vs actual total tracking
 - **PO lifecycle:** DRAFT → ISSUED → PARTIALLY_RECEIVED → COMPLETED / CANCELLED
-- **Actual cost recording** — per PO with cost type (Material, Labor, Overhead, Logistics, Other)
+- **Actual cost recording** — per PO with cost type (Material, Labor, Overhead, Logistics, Shipping, Tax, Other)
 - **Auto-recalculate** — completing a PO auto-recalculates the linked budget
 - **Variance monitoring** — dashboard comparing estimated vs actual costs
 
@@ -477,6 +541,12 @@ No model changes needed. The Django ORM handles the translation.
 ### Dashboard
 - **Summary statistics** with stat cards for RFQs, quotations, costing sheets, and more
 - **Quick navigation** to all modules
+
+### Audit Log & Project Reports
+- **System-wide audit log** — tracks 14 action types (CREATE, UPDATE, DELETE, SUBMIT, APPROVE, REJECT, STATUS_CHANGE, SEND, ISSUE, COMPLETE, CLOSE, RECALCULATE, SAVE_VERSION, EXPORT) across 8 modules (ACCOUNTS, PRODUCTS, RFQ, COSTING, SALES, BUDGET, PROCUREMENT, SETTINGS)
+- **Filterable & exportable** — filter by module, action type, object type, user; export to CSV
+- **Expandable detail rows** — view full change details inline
+- **Project lifecycle report** — multi-anchor view (Budget / RFQ / PO) with executive summary and CSV export
 
 ---
 
