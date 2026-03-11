@@ -5,7 +5,12 @@ set -e
 export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 
 # Extract DNS resolver from the container's resolv.conf (works on Docker, Railway, etc.)
-export NGINX_RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null || echo "8.8.8.8")
+RAW_RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null || echo "8.8.8.8")
+# Nginx requires IPv6 addresses to be wrapped in square brackets
+case "$RAW_RESOLVER" in
+    *:*) export NGINX_RESOLVER="[$RAW_RESOLVER]" ;;
+    *)   export NGINX_RESOLVER="$RAW_RESOLVER" ;;
+esac
 echo "DNS resolver: ${NGINX_RESOLVER}"
 
 # Use envsubst to replace variables in nginx config
