@@ -4,8 +4,13 @@ set -e
 # Substitute environment variables in nginx config
 export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 
-# Use envsubst to replace BACKEND_URL in nginx config
-envsubst '${BACKEND_URL}' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp
+# Extract DNS resolver from the container's resolv.conf (works on Docker, Railway, etc.)
+export NGINX_RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null || echo "8.8.8.8")
+echo "DNS resolver: ${NGINX_RESOLVER}"
+
+# Use envsubst to replace variables in nginx config
+# Only substitute our custom vars — leave nginx variables ($host, $uri, etc.) intact
+envsubst '${BACKEND_URL} ${NGINX_RESOLVER}' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp
 mv /etc/nginx/conf.d/default.conf.tmp /etc/nginx/conf.d/default.conf
 
 echo "Nginx configured: BACKEND_URL=${BACKEND_URL}"
