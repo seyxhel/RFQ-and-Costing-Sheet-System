@@ -27,6 +27,9 @@ fi
 echo "Creating default admin (if configured)..."
 python manage.py create_default_admin || true
 
+echo "Seeding demo data..."
+python manage.py seed_all || true
+
 echo "Collecting static files..."
 python manage.py collectstatic --noinput 2>/dev/null || true
 
