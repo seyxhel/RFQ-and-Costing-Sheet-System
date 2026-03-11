@@ -3,16 +3,24 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
 import { costingAPI, costCategoryAPI } from '../../services/costingService';
+import { rfqAPI } from '../../services/rfqService';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 
-const MARGIN_LABELS = ['LOW', 'MEDIUM', 'HIGH'] as const;
-const MARGIN_DISPLAY: Record<string, string> = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High' };
+const MARGIN_LABELS = ['VERY_LOW', 'LOW', 'MEDIUM_LOW', 'MEDIUM_HIGH', 'HIGH', 'VERY_HIGH'] as const;
+const MARGIN_DISPLAY: Record<string, string> = { VERY_LOW: 'Very Low', LOW: 'Low', MEDIUM_LOW: 'Medium-Low', MEDIUM_HIGH: 'Medium-High', HIGH: 'High', VERY_HIGH: 'Very High', CUSTOM: 'Custom' };
 
 const DEFAULT_MARGIN = (label: string) => ({
   label,
   facilitation_percent: '10.00',
-  desired_margin_percent: label === 'LOW' ? '20.00' : label === 'MEDIUM' ? '40.00' : '50.00',
+  desired_margin_percent:
+    label === 'VERY_LOW' ? '10.00'
+    : label === 'LOW' ? '20.00'
+    : label === 'MEDIUM_LOW' ? '30.00'
+    : label === 'MEDIUM_HIGH' ? '40.00'
+    : label === 'HIGH' ? '50.00'
+    : label === 'VERY_HIGH' ? '60.00'
+    : '35.00',
   jv_cost_percent: '0.00',
   cost_of_money_percent: '1.00',
   municipal_tax_percent: '1.00',
@@ -34,17 +42,21 @@ export default function CostingForm() {
   const [form, setForm] = useState({
     title: '', description: '', project_title: '', client_name: '',
     date: new Date().toISOString().split('T')[0], warranty: '',
-    contingency_percent: '5.00', vat_rate: '12.00', status: 'DRAFT',
+    contingency_percent: '5.00', vat_rate: '12.00', commission_rate: '10.00', status: 'DRAFT',
+    rfq: '' as string | number,
   });
+  const [rfqList, setRfqList] = useState<any[]>([]);
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
   const [margins, setMargins] = useState(MARGIN_LABELS.map((l) => DEFAULT_MARGIN(l)));
-  const [activeTab, setActiveTab] = useState<string>('LOW');
+  const [activeTab, setActiveTab] = useState<string>('VERY_LOW');
+  const [hasCustomMargin, setHasCustomMargin] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // Load cost categories
+  // Load cost categories and RFQ list
   useEffect(() => {
     costCategoryAPI.list().then((r) => setCategories(r.data.results || r.data || [])).catch(() => {});
+    rfqAPI.list().then((r) => setRfqList(r.data.results || r.data || [])).catch(() => {});
   }, []);
 
   // Load existing sheet in edit mode
@@ -57,7 +69,8 @@ export default function CostingForm() {
           project_title: d.project_title || '', client_name: d.client_name || '',
           date: d.date || new Date().toISOString().split('T')[0],
           warranty: d.warranty || '', contingency_percent: d.contingency_percent || '5.00',
-          vat_rate: d.vat_rate || '12.00', status: d.status || 'DRAFT',
+          vat_rate: d.vat_rate || '12.00', commission_rate: d.commission_rate || '10.00', status: d.status || 'DRAFT',
+          rfq: d.rfq || '',
         });
         if (d.line_items?.length) {
           setItems(d.line_items.map((li: any) => ({
@@ -66,7 +79,7 @@ export default function CostingForm() {
           })));
         }
         if (d.margin_levels?.length) {
-          setMargins(d.margin_levels.map((ml: any) => ({
+          const loadedMargins = d.margin_levels.map((ml: any) => ({
             label: ml.label,
             facilitation_percent: ml.facilitation_percent || '10.00',
             desired_margin_percent: ml.desired_margin_percent || '20.00',
@@ -81,7 +94,11 @@ export default function CostingForm() {
             withholding_tax_percent: ml.withholding_tax_percent || '2.00',
             creditable_tax_percent: ml.creditable_tax_percent || '5.00',
             warranty_security_percent: ml.warranty_security_percent || '5.00',
-          })));
+          }));
+          setMargins(loadedMargins);
+          if (loadedMargins.some((m: any) => m.label === 'CUSTOM')) {
+            setHasCustomMargin(true);
+          }
         }
       }).catch(() => { toast.error('Failed to load'); navigate('/costing'); });
     }
@@ -110,7 +127,7 @@ export default function CostingForm() {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, line_items: items, margin_levels: margins };
+      const payload = { ...form, rfq: form.rfq || null, line_items: items, margin_levels: margins };
       if (isEdit) {
         await costingAPI.update(Number(id), payload);
         toast.success('Costing sheet updated');
@@ -130,7 +147,20 @@ export default function CostingForm() {
   const labelCls = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
   const smallLabelCls = 'block text-xs font-medium text-gray-500 mb-1';
 
+  const allMarginLabels = hasCustomMargin ? [...MARGIN_LABELS, 'CUSTOM' as const] : [...MARGIN_LABELS];
   const activeMargin = margins.find((m) => m.label === activeTab) || margins[0];
+
+  const toggleCustomMargin = () => {
+    if (hasCustomMargin) {
+      setMargins(prev => prev.filter(m => m.label !== 'CUSTOM'));
+      if (activeTab === 'CUSTOM') setActiveTab('VERY_LOW');
+      setHasCustomMargin(false);
+    } else {
+      setMargins(prev => [...prev, DEFAULT_MARGIN('CUSTOM')]);
+      setHasCustomMargin(true);
+      setActiveTab('CUSTOM');
+    }
+  };
 
   // Client-side preview of gross selling for each margin tab
   const previewGrossSelling = (m: typeof activeMargin) => {
@@ -150,7 +180,7 @@ export default function CostingForm() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Costing Sheet' : 'New Costing Sheet'}</h1>
-          <p className="text-gray-500 dark:text-gray-400">PH-tax-aware cost breakdown with 3-margin model</p>
+          <p className="text-gray-500 dark:text-gray-400">PH-tax-aware cost breakdown with 6-margin model</p>
         </div>
         <GreenButton variant="outline" onClick={() => navigate('/costing')}><ArrowLeft className="w-4 h-4 mr-2" /> Back</GreenButton>
       </div>
@@ -180,6 +210,15 @@ export default function CostingForm() {
               <input name="warranty" value={form.warranty} onChange={handleChange} className={inputCls} placeholder="e.g. 1 Year Parts & Labor" />
             </div>
             <div>
+              <label className={labelCls}>Linked RFQ</label>
+              <select name="rfq" value={form.rfq} onChange={handleChange} className={inputCls}>
+                <option value="">— None —</option>
+                {rfqList.map((r: any) => (
+                  <option key={r.id} value={r.id}>{r.rfq_number} — {r.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className={labelCls}>Status</label>
               <select name="status" value={form.status} onChange={handleChange} className={inputCls}>
                 <option value="DRAFT">Draft</option>
@@ -195,6 +234,10 @@ export default function CostingForm() {
             <div>
               <label className={labelCls}>VAT Rate %</label>
               <input name="vat_rate" type="number" step="0.01" min="0" max="100" value={form.vat_rate} onChange={handleChange} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Commission Rate %</label>
+              <input name="commission_rate" type="number" step="0.01" min="0" max="100" value={form.commission_rate} onChange={handleChange} className={inputCls} />
             </div>
             <div className="md:col-span-3">
               <label className={labelCls}>Description</label>
@@ -248,19 +291,28 @@ export default function CostingForm() {
         {/* ---- Margin Levels (Tabs) ---- */}
         <Card accent title="Margin Levels">
           <div className="mb-4">
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
-              {MARGIN_LABELS.map((label) => {
-                const gs = previewGrossSelling(margins.find((m) => m.label === label)!);
+            <div className="flex flex-wrap items-center border-b border-gray-200 dark:border-gray-700">
+              {allMarginLabels.map((label) => {
+                const m = margins.find((m) => m.label === label);
+                if (!m) return null;
+                const gs = previewGrossSelling(m);
+                const isCustom = label === 'CUSTOM';
                 return (
                   <button key={label} type="button" onClick={() => setActiveTab(label)}
-                    className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === label
-                      ? 'border-[#3BC25B] text-[#0E8F79] dark:text-[#3BC25B]'
+                    className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === label
+                      ? isCustom ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-[#3BC25B] text-[#0E8F79] dark:text-[#3BC25B]'
                       : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
                     {MARGIN_DISPLAY[label]}
-                    <span className="ml-2 text-xs opacity-70">₱{gs.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                    <span className="ml-1 text-xs opacity-70">₱{gs.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                   </button>
                 );
               })}
+              <button type="button" onClick={toggleCustomMargin}
+                className={`ml-auto px-3 py-2 text-xs font-medium rounded-lg transition ${hasCustomMargin
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 hover:bg-purple-200'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200'}`}>
+                {hasCustomMargin ? '✕ Remove Custom' : '+ Add Custom Margin'}
+              </button>
             </div>
           </div>
 
@@ -324,7 +376,7 @@ export default function CostingForm() {
 
             {/* Live preview */}
             <div className="mt-4 p-4 bg-gradient-to-r from-[#0E8F79]/5 to-[#3BC25B]/5 dark:from-[#0E8F79]/10 dark:to-[#3BC25B]/10 rounded-lg border border-[#3BC25B]/20">
-              <h4 className="text-sm font-semibold text-[#0E8F79] mb-3">Live Preview — {MARGIN_DISPLAY[activeTab]}</h4>
+              <h4 className="text-sm font-semibold text-[#0E8F79] mb-3">Live Preview — {MARGIN_DISPLAY[activeTab] || activeTab}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-gray-500">Gross Selling (VAT Ex)</p>

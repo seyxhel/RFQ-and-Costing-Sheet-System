@@ -35,6 +35,8 @@ class Product(models.Model):
         Category, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="products",
     )
+    brand = models.CharField(max_length=255, blank=True, default="")
+    model_number = models.CharField(max_length=255, blank=True, default="")
     unit = models.CharField(max_length=30, default="pcs", help_text="Default unit of measure")
     specifications = models.TextField(blank=True, default="", help_text="Technical specs, tolerances, etc.")
     estimated_unit_cost = models.DecimalField(

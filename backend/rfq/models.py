@@ -21,6 +21,9 @@ class Supplier(models.Model):
     phone = models.CharField(max_length=30, blank=True, default="")
     address = models.TextField(blank=True, default="")
     website = models.URLField(blank=True, default="")
+    viber = models.CharField(max_length=30, blank=True, default="")
+    whatsapp = models.CharField(max_length=30, blank=True, default="")
+    facebook = models.CharField(max_length=255, blank=True, default="")
 
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     on_time_delivery_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
@@ -44,7 +47,8 @@ class Supplier(models.Model):
 class RFQ(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
-        PENDING = "PENDING", "Pending"
+        PENDING_FOR_CANVASS = "PENDING_FOR_CANVASS", "Pending for Canvass"
+        CANVASS_DONE = "CANVASS_DONE", "Canvass Complete"
         SENT = "SENT", "Sent to Suppliers"
         RECEIVED = "RECEIVED", "Quotations Received"
         UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
@@ -67,7 +71,7 @@ class RFQ(models.Model):
     client_name = models.CharField(max_length=255, blank=True, default="")
     company_name = models.CharField(max_length=255, blank=True, default="")
 
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.DRAFT)
     priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
 
     issue_date = models.DateField(default=datetime.date.today)

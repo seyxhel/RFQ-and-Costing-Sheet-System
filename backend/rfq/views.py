@@ -80,26 +80,26 @@ class RFQViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
-        """Move RFQ from DRAFT to PENDING."""
+        """Move RFQ from DRAFT to PENDING_FOR_CANVASS."""
         rfq = self.get_object()
         if rfq.status != RFQ.Status.DRAFT:
             return Response(
                 {"detail": "Only DRAFT RFQs can be submitted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        rfq.status = RFQ.Status.PENDING
+        rfq.status = RFQ.Status.PENDING_FOR_CANVASS
         rfq.save(update_fields=["status"])
         log_action(request=request, module=AuditLog.Module.RFQ,
                    action=AuditLog.ActionType.SUBMIT, object_type="RFQ",
                    object_id=rfq.id, object_repr=rfq.rfq_number,
-                   old_status="DRAFT", new_status="PENDING")
+                   old_status="DRAFT", new_status="PENDING_FOR_CANVASS")
         return Response(RFQDetailSerializer(rfq).data)
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """Approve an RFQ under review."""
         rfq = self.get_object()
-        if rfq.status not in (RFQ.Status.PENDING, RFQ.Status.UNDER_REVIEW):
+        if rfq.status not in (RFQ.Status.PENDING_FOR_CANVASS, RFQ.Status.UNDER_REVIEW, RFQ.Status.CANVASS_DONE):
             return Response(
                 {"detail": "RFQ is not in an approvable state."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -115,7 +115,7 @@ class RFQViewSet(viewsets.ModelViewSet):
         log_action(request=request, module=AuditLog.Module.RFQ,
                    action=AuditLog.ActionType.APPROVE, object_type="RFQ",
                    object_id=rfq.id, object_repr=rfq.rfq_number,
-                   old_status="PENDING", new_status="APPROVED")
+                   old_status="PENDING_FOR_CANVASS", new_status="APPROVED")
         return Response(RFQDetailSerializer(rfq).data)
 
     @action(detail=True, methods=["post"])
@@ -132,6 +132,23 @@ class RFQViewSet(viewsets.ModelViewSet):
                    action=AuditLog.ActionType.REJECT, object_type="RFQ",
                    object_id=rfq.id, object_repr=rfq.rfq_number,
                    new_status="REJECTED")
+        return Response(RFQDetailSerializer(rfq).data)
+
+    @action(detail=True, methods=["post"])
+    def complete_canvass(self, request, pk=None):
+        """Purchasing marks canvass as complete for this RFQ."""
+        rfq = self.get_object()
+        if rfq.status != RFQ.Status.PENDING_FOR_CANVASS:
+            return Response(
+                {"detail": "Only RFQs pending for canvass can be marked complete."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        rfq.status = RFQ.Status.CANVASS_DONE
+        rfq.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.RFQ,
+                   action=AuditLog.ActionType.UPDATE, object_type="RFQ",
+                   object_id=rfq.id, object_repr=rfq.rfq_number,
+                   old_status="PENDING_FOR_CANVASS", new_status="CANVASS_DONE")
         return Response(RFQDetailSerializer(rfq).data)
 
     @action(detail=True, methods=["get"])

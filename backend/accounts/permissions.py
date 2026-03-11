@@ -34,7 +34,7 @@ class CanEditFinancial(BasePermission):
 
 
 class IsOwnerOrAdmin(BasePermission):
-    """Object-level: owner of the record or ADMIN can modify."""
+    """Object-level: owner of the record or MANAGEMENT can modify."""
 
     def has_object_permission(self, request, view, obj):
         if request.user.is_admin_role:

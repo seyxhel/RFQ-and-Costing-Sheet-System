@@ -159,7 +159,7 @@ export default function QuotationForm() {
                         {it.model_number && <span className="text-gray-500 ml-1">({it.model_number})</span>}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {it.offer_type === 'COUNTER' ? 'Counter-offer' : 'Same as req'} • {it.vat_type === 'VAT_INC' ? 'VAT Inc' : it.vat_type === 'VAT_EX' ? 'VAT Ex' : 'Exempt'} • ₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {it.offer_type === 'COUNTER' ? 'Counter-offer' : 'Same as req'} • {it.vat_type === 'VAT_INC' ? 'VAT Inc' : 'VAT Ex'} • ₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <button type="button" onClick={(e) => { e.stopPropagation(); removeItem(idx); }} className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"><Trash2 className="w-4 h-4" /></button>
@@ -218,13 +218,12 @@ export default function QuotationForm() {
                       </div>
 
                       {/* Row 3: VAT */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div>
-                          <label className={smallLabel}>VAT Type</label>
+                          <label className={smallLabel}>Tax Type</label>
                           <select value={it.vat_type} onChange={(e) => handleItemChange(idx, 'vat_type', e.target.value)} className={inputCls}>
                             <option value="VAT_INC">VAT Inclusive</option>
                             <option value="VAT_EX">VAT Exclusive</option>
-                            <option value="VAT_EXEMPT">VAT Exempt</option>
                           </select>
                         </div>
                         <div>
@@ -232,12 +231,14 @@ export default function QuotationForm() {
                           <input type="number" step="0.01" value={it.vat_rate} onChange={(e) => handleItemChange(idx, 'vat_rate', e.target.value)} className={inputCls} />
                         </div>
                         <div>
-                          <label className={smallLabel}>Tax Type</label>
-                          <input value={it.tax_type} onChange={(e) => handleItemChange(idx, 'tax_type', e.target.value)} className={inputCls} placeholder="e.g. Inclusive of All Taxes" />
-                        </div>
-                        <div>
                           <label className={smallLabel}>Subtotal</label>
                           <p className="py-2.5 text-sm font-bold text-[#0E8F79]">₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                          {subtotal > 0 && it.vat_type === 'VAT_INC' && (
+                            <div className="mt-1 space-y-0.5">
+                              <p className="text-xs font-semibold text-amber-500">VAT ({it.vat_rate}%): ₱{(subtotal - subtotal / (1 + Number(it.vat_rate || 0) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                              <p className="text-xs font-semibold text-blue-500">Ex-VAT: ₱{(subtotal / (1 + Number(it.vat_rate || 0) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
 

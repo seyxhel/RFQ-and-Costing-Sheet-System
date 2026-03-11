@@ -9,6 +9,7 @@ from .models import Budget
 class BudgetListSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
     rfq_number = serializers.CharField(source="rfq.rfq_number", read_only=True, default="")
+    sales_order_number = serializers.CharField(source="sales_order.so_number", read_only=True, default="")
     utilization_percent = serializers.SerializerMethodField()
 
     class Meta:
@@ -17,7 +18,7 @@ class BudgetListSerializer(serializers.ModelSerializer):
             "id", "budget_number", "title", "status",
             "allocated_amount", "spent_amount", "remaining_amount",
             "currency", "rfq", "rfq_number", "costing_sheet", "sales_order",
-            "utilization_percent",
+            "sales_order_number", "utilization_percent",
             "created_by_name", "created_at",
         ]
 
@@ -29,6 +30,9 @@ class BudgetListSerializer(serializers.ModelSerializer):
 
 class BudgetDetailSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    rfq_title = serializers.SerializerMethodField()
+    costing_sheet_title = serializers.SerializerMethodField()
+    sales_order_number = serializers.CharField(source="sales_order.so_number", read_only=True, default="")
     utilization_percent = serializers.SerializerMethodField()
 
     class Meta:
@@ -36,7 +40,8 @@ class BudgetDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id", "budget_number", "title", "description", "status",
             "allocated_amount", "spent_amount", "remaining_amount", "currency",
-            "rfq", "costing_sheet", "sales_order",
+            "rfq", "rfq_title", "costing_sheet", "costing_sheet_title",
+            "sales_order", "sales_order_number",
             "created_by", "created_by_name", "approved_by", "approved_at",
             "utilization_percent",
             "created_at", "updated_at",
@@ -51,6 +56,16 @@ class BudgetDetailSerializer(serializers.ModelSerializer):
         if obj.allocated_amount and obj.allocated_amount > 0:
             return round(float(obj.spent_amount / obj.allocated_amount * 100), 2)
         return 0.0
+
+    def get_rfq_title(self, obj):
+        if obj.rfq:
+            return f"{obj.rfq.rfq_number} — {obj.rfq.title}"
+        return ""
+
+    def get_costing_sheet_title(self, obj):
+        if obj.costing_sheet:
+            return f"{obj.costing_sheet.sheet_number} — {obj.costing_sheet.title}"
+        return ""
 
     def create(self, validated_data):
         import datetime

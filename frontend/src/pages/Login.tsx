@@ -40,16 +40,29 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-xl bg-gray-900 border border-gray-800 shadow-xl p-8">
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none"
+      >
+        <source src="/240968.mp4" type="video/mp4" />
+      </video>
+
+      <div className="relative z-10 w-full max-w-md rounded-xl bg-gray-900/80 backdrop-blur-md border border-gray-800 shadow-xl p-8">
         <div className="flex justify-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white font-bold text-2xl">
-            B
-          </div>
+          <img
+            src="/Maptech%20Official%20Logo%20version2%20(1).png"
+            alt="Maptech"
+            className="h-20 w-auto object-contain"
+          />
         </div>
 
         <h1 className="text-xl font-bold text-white text-center">Welcome Back</h1>
-        <p className="text-sm text-gray-400 text-center mt-1 mb-6">Sign in to Business System</p>
+        <p className="text-sm text-gray-400 text-center mt-1 mb-6">Sign in to Maptech RFQ & Costing</p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (

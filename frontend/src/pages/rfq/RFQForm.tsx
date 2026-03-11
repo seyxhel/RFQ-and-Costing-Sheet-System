@@ -100,7 +100,7 @@ export default function RFQForm() {
               <input name="title" value={form.title} onChange={handleChange} required className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Deadline</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Deadline <span className="text-red-500">*</span></label>
               <input name="deadline" type="date" value={form.deadline} onChange={handleChange} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
             </div>
             <div className="md:col-span-2">
@@ -113,7 +113,7 @@ export default function RFQForm() {
 
         <Card accent className="mt-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Line Items</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Line Items <span className="text-red-500">*</span></h3>
             <GreenButton type="button" variant="outline" onClick={addItem}><Plus className="w-4 h-4 mr-1" /> Add Item</GreenButton>
           </div>
           <div className="space-y-4">

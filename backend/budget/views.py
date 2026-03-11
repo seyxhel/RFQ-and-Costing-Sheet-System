@@ -14,7 +14,7 @@ from .serializers import BudgetListSerializer, BudgetDetailSerializer
 
 
 class BudgetViewSet(viewsets.ModelViewSet):
-    queryset = Budget.objects.select_related("rfq", "costing_sheet", "created_by", "approved_by")
+    queryset = Budget.objects.select_related("rfq", "costing_sheet", "sales_order", "created_by", "approved_by")
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):

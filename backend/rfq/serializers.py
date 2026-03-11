@@ -4,6 +4,7 @@
 
 from rest_framework import serializers
 from .models import Supplier, RFQ, RFQItem, Quotation, QuotationItem, ApprovalLog
+from products.models import Product
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -151,12 +152,53 @@ class QuotationDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "submitted_at", "updated_at"]
 
+    @staticmethod
+    def _auto_register_products(quotation):
+        """Silently register canvass items into Product Catalog if not already existing."""
+        for qi in quotation.items.select_related("rfq_item").all():
+            rfq_item = qi.rfq_item
+            item_name = qi.brand and qi.brand.strip() or rfq_item.item_name
+            brand = qi.brand or rfq_item.brand
+            model_number = qi.model_number or rfq_item.model_number
+            supplier = quotation.supplier
+
+            exists = Product.objects.filter(
+                name__iexact=rfq_item.item_name,
+                brand__iexact=brand,
+                model_number__iexact=model_number,
+                supplier=supplier,
+            ).exists()
+            if exists:
+                continue
+
+            # Auto-generate SKU
+            last = Product.objects.filter(sku__startswith="PRD-").order_by("-sku").first()
+            if last and last.sku.startswith("PRD-"):
+                try:
+                    num = int(last.sku.split("-")[1]) + 1
+                except (ValueError, IndexError):
+                    num = Product.objects.count() + 1
+            else:
+                num = 1
+
+            Product.objects.create(
+                sku=f"PRD-{num:05d}",
+                name=rfq_item.item_name,
+                brand=brand,
+                model_number=model_number,
+                description=qi.description or rfq_item.description,
+                unit=qi.unit or rfq_item.unit,
+                specifications=rfq_item.specifications,
+                supplier=supplier,
+            )
+
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         quotation = Quotation.objects.create(**validated_data)
         for item_data in items_data:
             QuotationItem.objects.create(quotation=quotation, **item_data)
         quotation.recalculate_total()
+        self._auto_register_products(quotation)
         return quotation
 
     def update(self, instance, validated_data):
@@ -169,6 +211,7 @@ class QuotationDetailSerializer(serializers.ModelSerializer):
             for item_data in items_data:
                 QuotationItem.objects.create(quotation=instance, **item_data)
         instance.recalculate_total()
+        self._auto_register_products(instance)
         return instance
 
 

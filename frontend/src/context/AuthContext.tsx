@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import api from '../services/api';
 
-export type Role = 'ADMIN' | 'MANAGER' | 'PROCUREMENT' | 'FINANCE' | 'VIEWER';
+export type Role = 'MANAGEMENT' | 'SALES' | 'PURCHASING';
 
 export interface AuthUser {
   id: number;
@@ -20,7 +20,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  isAdmin: () => boolean;
+  isManagement: () => boolean;
   canApprove: () => boolean;
   refreshUser: () => Promise<void>;
 }
@@ -50,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login';
   }, []);
 
-  const isAdmin = useCallback(() => user?.role === 'ADMIN' || (user as any)?.is_superuser === true, [user]);
-  const canApprove = useCallback(() => ['ADMIN', 'MANAGER'].includes(user?.role || ''), [user]);
+  const isManagement = useCallback(() => user?.role === 'MANAGEMENT' || (user as any)?.is_superuser === true, [user]);
+  const canApprove = useCallback(() => user?.role === 'MANAGEMENT', [user]);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, canApprove, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isManagement, canApprove, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

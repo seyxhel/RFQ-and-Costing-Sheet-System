@@ -109,6 +109,7 @@ export default function BudgetDetail() {
           <div><span className="font-medium text-gray-500 dark:text-gray-400">Description:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.description || '—'}</span></div>
           <div><span className="font-medium text-gray-500 dark:text-gray-400">Linked RFQ:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.rfq_title || '—'}</span></div>
           <div><span className="font-medium text-gray-500 dark:text-gray-400">Linked Costing:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.costing_sheet_title || '—'}</span></div>
+          <div><span className="font-medium text-gray-500 dark:text-gray-400">Linked Sales Order:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.sales_order_number || '—'}</span></div>
           <div><span className="font-medium text-gray-500 dark:text-gray-400">Created by:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.created_by_name || '—'}</span></div>
           <div><span className="font-medium text-gray-500 dark:text-gray-400">Approved by:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.approved_by_name || '—'}</span></div>
           <div><span className="font-medium text-gray-500 dark:text-gray-400">Created:</span> <span className="text-gray-900 dark:text-white ml-2">{budget.created_at?.slice(0, 10)}</span></div>

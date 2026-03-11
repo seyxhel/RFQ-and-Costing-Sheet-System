@@ -164,7 +164,7 @@ class CostingSheetDetailSerializer(serializers.ModelSerializer):
             "project_title", "client_name", "date", "warranty",
             "status", "version",
             "total_cost", "contingency_percent", "contingency_amount",
-            "total_project_cost", "vat_rate", "currency",
+            "total_project_cost", "vat_rate", "commission_rate", "currency",
             "rfq", "rfq_number",
             "created_by", "created_by_name", "approved_by",
             "line_items", "margin_levels",
@@ -203,9 +203,12 @@ class CostingSheetDetailSerializer(serializers.ModelSerializer):
         # Create 3 default margin levels if none provided
         if not margin_levels_data:
             margin_levels_data = [
+                {"label": "VERY_LOW", "desired_margin_percent": "10.00"},
                 {"label": "LOW", "desired_margin_percent": "20.00"},
-                {"label": "MEDIUM", "desired_margin_percent": "40.00"},
+                {"label": "MEDIUM_LOW", "desired_margin_percent": "30.00"},
+                {"label": "MEDIUM_HIGH", "desired_margin_percent": "40.00"},
                 {"label": "HIGH", "desired_margin_percent": "50.00"},
+                {"label": "VERY_HIGH", "desired_margin_percent": "60.00"},
             ]
 
         for ml_data in margin_levels_data:
@@ -240,6 +243,9 @@ class CostingSheetDetailSerializer(serializers.ModelSerializer):
 
         # Update margin levels if provided
         if margin_levels_data is not None:
+            submitted_labels = {ml_data.get("label") for ml_data in margin_levels_data if ml_data.get("label")}
+            # Remove margin levels no longer submitted (e.g. custom removed)
+            instance.margin_levels.exclude(label__in=submitted_labels).delete()
             for ml_data in margin_levels_data:
                 label = ml_data.get("label")
                 if label:

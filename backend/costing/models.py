@@ -90,6 +90,10 @@ class CostingSheet(models.Model):
 
     # VAT rate for all margin-level computations
     vat_rate = models.DecimalField(max_digits=5, decimal_places=2, default=12.00)
+    commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=10.00,
+        help_text="Default commission rate (%) applied to margin levels",
+    )
     currency = models.CharField(max_length=10, default="PHP")
 
     # Integration
@@ -173,12 +177,16 @@ class CostingLineItem(models.Model):
 # --------------------------------------------------------------------------
 class CostingMarginLevel(models.Model):
     class Label(models.TextChoices):
+        VERY_LOW = "VERY_LOW", "Very Low"
         LOW = "LOW", "Low"
-        MEDIUM = "MEDIUM", "Medium"
+        MEDIUM_LOW = "MEDIUM_LOW", "Medium-Low"
+        MEDIUM_HIGH = "MEDIUM_HIGH", "Medium-High"
         HIGH = "HIGH", "High"
+        VERY_HIGH = "VERY_HIGH", "Very High"
+        CUSTOM = "CUSTOM", "Custom"
 
     costing_sheet = models.ForeignKey(CostingSheet, on_delete=models.CASCADE, related_name="margin_levels")
-    label = models.CharField(max_length=10, choices=Label.choices)
+    label = models.CharField(max_length=15, choices=Label.choices)
 
     # ---- Input percentages (user-configurable per margin level) ----
     facilitation_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
