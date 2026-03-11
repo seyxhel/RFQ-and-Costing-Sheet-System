@@ -1,33 +1,59 @@
-"""
-Management command: create_default_admin
-Creates an ADMIN superuser if one doesn't exist yet.
-Uses env vars DJANGO_SUPERUSER_USERNAME, DJANGO_SUPERUSER_PASSWORD, DJANGO_SUPERUSER_EMAIL.
-"""
-import os
 from django.core.management.base import BaseCommand
 from accounts.models import User
 
 
 class Command(BaseCommand):
-    help = "Create a default admin superuser from environment variables (if not exists)"
+    help = "Create default accounts (idempotent)."
 
     def handle(self, *args, **options):
-        username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
-        password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "")
-        email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@example.com")
+        defaults = [
+            {
+                "username": "admin",
+                "password": "admin",
+                "role": User.Role.MANAGEMENT,
+                "is_staff": True,
+                "is_superuser": True,
+                "first_name": "Admin",
+                "last_name": "User",
+            },
+            {
+                "username": "management",
+                "password": "management",
+                "role": User.Role.MANAGEMENT,
+                "is_staff": False,
+                "is_superuser": False,
+                "first_name": "Management",
+                "last_name": "User",
+            },
+            {
+                "username": "sales",
+                "password": "sales",
+                "role": User.Role.SALES,
+                "is_staff": False,
+                "is_superuser": False,
+                "first_name": "Sales",
+                "last_name": "User",
+            },
+            {
+                "username": "purchasing",
+                "password": "purchasing",
+                "role": User.Role.PURCHASING,
+                "is_staff": False,
+                "is_superuser": False,
+                "first_name": "Purchasing",
+                "last_name": "User",
+            },
+        ]
 
-        if not password:
-            self.stdout.write(self.style.WARNING("DJANGO_SUPERUSER_PASSWORD not set — skipping admin creation."))
-            return
-
-        if User.objects.filter(username=username).exists():
-            self.stdout.write(self.style.SUCCESS(f"Admin user '{username}' already exists."))
-            return
-
-        User.objects.create_superuser(
-            username=username,
-            email=email,
-            password=password,
-            role="ADMIN",
-        )
-        self.stdout.write(self.style.SUCCESS(f"Created admin user '{username}'."))
+        for entry in defaults:
+            username = entry.pop("username")
+            password = entry.pop("password")
+            user, created = User.objects.get_or_create(
+                username=username, defaults=entry
+            )
+            if created:
+                user.set_password(password)
+                user.save(update_fields=["password"])
+                self.stdout.write(self.style.SUCCESS(f"Created user: {username}"))
+            else:
+                self.stdout.write(f"User already exists: {username}")
