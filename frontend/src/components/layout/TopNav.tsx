@@ -22,11 +22,9 @@ function getDisplayName(user: any): string {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  ADMIN: 'Administrator',
-  MANAGER: 'Manager',
-  PROCUREMENT: 'Procurement Officer',
-  FINANCE: 'Finance Officer',
-  VIEWER: 'Viewer',
+  MANAGEMENT: 'Management',
+  SALES: 'Sales',
+  PURCHASING: 'Purchasing',
 };
 
 export function TopNav({ isDark, onToggleDark, onMenuClick, onNavigate }: TopNavProps) {

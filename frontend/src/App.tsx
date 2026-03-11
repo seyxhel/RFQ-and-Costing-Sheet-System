@@ -73,10 +73,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin, loading } = useAuth();
+function ManagementRoute({ children }: { children: React.ReactNode }) {
+  const { isManagement, loading } = useAuth();
   if (loading) return null;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isManagement()) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -154,10 +154,10 @@ function AppRoutes() {
                 {/* Variance Dashboard */}
                 <Route path="/variance" element={<VarianceDashboard />} />
 
-                {/* Users (admin) */}
-                <Route path="/users" element={<AdminRoute><UserList /></AdminRoute>} />
-                <Route path="/users/new" element={<AdminRoute><UserForm /></AdminRoute>} />
-                <Route path="/users/:id/edit" element={<AdminRoute><UserForm /></AdminRoute>} />
+                {/* Users (management) */}
+                <Route path="/users" element={<ManagementRoute><UserList /></ManagementRoute>} />
+                <Route path="/users/new" element={<ManagementRoute><UserForm /></ManagementRoute>} />
+                <Route path="/users/:id/edit" element={<ManagementRoute><UserForm /></ManagementRoute>} />
 
                 {/* Reports & Audit */}
                 <Route path="/audit-log" element={<AuditLog />} />

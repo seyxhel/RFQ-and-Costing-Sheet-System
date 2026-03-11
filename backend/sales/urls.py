@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
+router.register(r"clients", views.ClientViewSet, basename="client")
 router.register(r"quotations", views.FormalQuotationViewSet, basename="formalquotation")
 router.register(r"orders", views.SalesOrderViewSet, basename="salesorder")
 router.register(r"contract-analyses", views.ContractAnalysisViewSet, basename="contractanalysis")

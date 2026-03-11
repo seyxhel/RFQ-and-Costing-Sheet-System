@@ -16,6 +16,26 @@ def _r(val):
 
 
 # --------------------------------------------------------------------------
+# Client (reusable client registry)
+# --------------------------------------------------------------------------
+class Client(models.Model):
+    name = models.CharField(max_length=255)
+    designation = models.CharField(max_length=255, blank=True, default="")
+    contact_number = models.CharField(max_length=100, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    address = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+# --------------------------------------------------------------------------
 # Formal Quotation (outgoing to client)
 # --------------------------------------------------------------------------
 class FormalQuotation(models.Model):
@@ -25,12 +45,19 @@ class FormalQuotation(models.Model):
         ACCEPTED = "ACCEPTED", "Accepted"
         REJECTED = "REJECTED", "Rejected"
         REVISED = "REVISED", "Revised"
+        WON = "WON", "Won"
 
     quotation_number = models.CharField(max_length=50, unique=True)
     date = models.DateField(default=datetime.date.today)
 
     # Client details
+    client = models.ForeignKey(
+        Client, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="formal_quotations",
+    )
     client_name = models.CharField(max_length=255)
+    client_designation = models.CharField(max_length=255, blank=True, default="")
+    client_contact_number = models.CharField(max_length=100, blank=True, default="")
     client_address = models.TextField(blank=True, default="")
     client_contact = models.CharField(max_length=255, blank=True, default="")
     client_email = models.EmailField(blank=True, default="")
@@ -117,8 +144,29 @@ class FormalQuotationItem(models.Model):
 
 
 # --------------------------------------------------------------------------
-# Sales Order (Awarded Project)
+# Quotation Revision (margin change history)
 # --------------------------------------------------------------------------
+class QuotationRevision(models.Model):
+    quotation = models.ForeignKey(
+        FormalQuotation, on_delete=models.CASCADE, related_name="revisions",
+    )
+    revision_number = models.PositiveIntegerField(default=1)
+    margin_level_label = models.CharField(max_length=15, blank=True, default="")
+    total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    vat_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    reason = models.TextField(blank=True, default="")
+    snapshot_items = models.JSONField(default=list)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-revision_number"]
+
+    def __str__(self):
+        return f"{self.quotation.quotation_number} rev{self.revision_number}"
 class SalesOrder(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"

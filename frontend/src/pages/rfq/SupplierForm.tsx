@@ -6,7 +6,7 @@ import { supplierAPI } from '../../services/rfqService';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 
-const EMPTY = { name: '', contact_person: '', email: '', phone: '', address: '', rating: '3.00', on_time_delivery_rate: '90.00', is_active: true };
+const EMPTY = { name: '', contact_person: '', email: '', phone: '', address: '', website: '', viber: '', whatsapp: '', facebook: '', rating: '3.00', on_time_delivery_rate: '90.00', is_active: true };
 
 export default function SupplierForm() {
   const { id } = useParams();
@@ -65,6 +65,22 @@ export default function SupplierForm() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Phone</label>
               <input name="phone" value={form.phone} onChange={handleChange} className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Viber</label>
+              <input name="viber" value={form.viber} onChange={handleChange} placeholder="+63 XXX XXX XXXX" className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">WhatsApp</label>
+              <input name="whatsapp" value={form.whatsapp} onChange={handleChange} placeholder="+63 XXX XXX XXXX" className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Facebook</label>
+              <input name="facebook" value={form.facebook} onChange={handleChange} placeholder="facebook.com/page" className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Website</label>
+              <input name="website" value={form.website} onChange={handleChange} placeholder="https://" className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Rating (1-5)</label>

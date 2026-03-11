@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
-import { rfqAPI, quotationAPI } from '../../services/rfqService';
+import { rfqAPI } from '../../services/rfqService';
+import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, CheckCircle, XCircle, DollarSign, Clock, Shield, Star,
+  ArrowLeft, DollarSign, Clock, Shield, Star,
   FileText, Calendar, Package, Truck, Award, Info, ChevronDown, ChevronUp,
-  Hash, AlertCircle, Download,
+  Hash, AlertCircle, Download, CheckCircle,
 } from 'lucide-react';
 
 const fmt = (v: any) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -20,33 +21,14 @@ const WARRANTY_LABELS: Record<string, string> = { '6MOS': '6 Months', '1YR': '1 
 export default function QuotationCompare() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [comparison, setComparison] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [accepting, setAccepting] = useState<number | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-
-  const reload = () => rfqAPI.compare(Number(id)).then((r) => setComparison(r.data)).catch(() => {});
 
   useEffect(() => {
     rfqAPI.compare(Number(id)).then((r) => { setComparison(r.data); setLoading(false); }).catch(() => { toast.error('Failed to load comparison'); setLoading(false); });
   }, [id]);
-
-  const handleAccept = async (quotationId: number) => {
-    setAccepting(quotationId);
-    try {
-      await quotationAPI.accept(quotationId);
-      toast.success('Canvass entry accepted! Others have been auto-rejected.');
-      reload();
-    } catch { toast.error('Failed to accept canvass entry'); } finally { setAccepting(null); }
-  };
-
-  const handleReject = async (quotationId: number) => {
-    try {
-      await quotationAPI.reject(quotationId);
-      toast.success('Canvass entry rejected');
-      reload();
-    } catch { toast.error('Failed to reject canvass entry'); }
-  };
 
   const toggleRow = (itemId: number) => {
     setExpandedRows((prev) => {
@@ -80,6 +62,7 @@ export default function QuotationCompare() {
     rows.push(`Status,${esc(rfqData.status)}`);
     rows.push(`Priority,${esc(rfqData.priority)}`);
     rows.push(`Issue Date,${esc(rfqData.issue_date)}`);
+    rows.push(`Date Created,${esc(rfqData.created_at?.slice(0, 10) || 'N/A')}`);
     rows.push(`Deadline,${esc(rfqData.deadline || 'N/A')}`);
     rows.push(`Total Items,${rfqData.item_count}`);
     rows.push(`Total Canvass Entries,${rfqData.quotation_count}`);
@@ -214,6 +197,10 @@ export default function QuotationCompare() {
             <div><p className="text-[10px] text-gray-500 uppercase font-semibold">Items / Canvass</p><p className="text-sm font-bold text-gray-900 dark:text-white">{rfq.item_count} items &middot; {rfq.quotation_count} canvass entr{rfq.quotation_count !== 1 ? 'ies' : 'y'}</p></div>
           </div>
           <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-teal-500/10"><Calendar className="w-5 h-5 text-teal-500" /></div>
+            <div><p className="text-[10px] text-gray-500 uppercase font-semibold">Date Created</p><p className="text-sm font-bold text-gray-900 dark:text-white">{rfq.created_at?.slice(0, 10) || rfq.issue_date || '—'}</p></div>
+          </div>
+          <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-orange-500/10"><Calendar className="w-5 h-5 text-orange-500" /></div>
             <div><p className="text-[10px] text-gray-500 uppercase font-semibold">Deadline</p><p className="text-sm font-bold text-gray-900 dark:text-white">{rfq.deadline || '—'}</p></div>
           </div>
@@ -274,26 +261,6 @@ export default function QuotationCompare() {
                     <div><p className="text-[10px] text-gray-500 uppercase">Currency</p><p className="text-sm font-bold text-gray-900 dark:text-white">{q.currency}</p></div>
                   </div>
                 </div>
-
-                {/* Accept / Reject */}
-                {q.status === 'PENDING' && (
-                  <div className="flex gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <button onClick={() => handleAccept(q.id)} disabled={accepting !== null}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#63D44A] to-[#0E8F79] rounded-lg hover:shadow-lg hover:shadow-green-200/50 dark:hover:shadow-green-900/30 transition-all disabled:opacity-50">
-                      {accepting === q.id ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle className="w-4 h-4" />} Accept
-                    </button>
-                    <button onClick={() => handleReject(q.id)} disabled={accepting !== null}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50">
-                      <XCircle className="w-4 h-4" /> Reject
-                    </button>
-                  </div>
-                )}
-                {q.status === 'ACCEPTED' && (
-                  <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700 text-green-600 dark:text-green-400"><CheckCircle className="w-4 h-4" /><span className="text-sm font-semibold">Accepted</span></div>
-                )}
-                {q.status === 'REJECTED' && (
-                  <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700 text-red-500 dark:text-red-400"><XCircle className="w-4 h-4" /><span className="text-sm font-semibold">Rejected</span></div>
-                )}
               </Card>
             );
           })}
@@ -521,7 +488,7 @@ export default function QuotationCompare() {
       )}
 
       {/* ======== Empty state ======== */}
-      {quotations.length === 0 && (
+      {quotations.length === 0 && user?.role !== 'SALES' && (
         <Card>
           <div className="text-center py-16 text-gray-400">
             <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />

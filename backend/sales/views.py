@@ -8,12 +8,49 @@ from rest_framework.response import Response
 from django.db.models import Q
 
 from accounts.models import AuditLog, log_action
-from .models import FormalQuotation, SalesOrder, ContractAnalysis
+from .models import FormalQuotation, SalesOrder, ContractAnalysis, Client, QuotationRevision
 from .serializers import (
+    ClientSerializer,
     FormalQuotationListSerializer, FormalQuotationDetailSerializer,
+    QuotationRevisionSerializer,
     SalesOrderListSerializer, SalesOrderDetailSerializer,
     ContractAnalysisSerializer,
 )
+
+
+class ClientViewSet(viewsets.ModelViewSet):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        q = self.request.query_params.get("search")
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q)
+                | Q(designation__icontains=q)
+                | Q(email__icontains=q)
+            )
+        return qs
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.CREATE, object_type="Client",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_action(request=self.request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.UPDATE, object_type="Client",
+                   object_id=obj.id, object_repr=obj.name)
+
+    def perform_destroy(self, instance):
+        log_action(request=self.request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.DELETE, object_type="Client",
+                   object_id=instance.id, object_repr=instance.name)
+        instance.delete()
 
 
 class FormalQuotationViewSet(viewsets.ModelViewSet):
@@ -48,21 +85,29 @@ class FormalQuotationViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    @action(detail=True, methods=["get"])
+    def revisions(self, request, pk=None):
+        """List revision history for this quotation."""
+        fq = self.get_object()
+        revs = fq.revisions.all()
+        return Response(QuotationRevisionSerializer(revs, many=True).data)
+
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
         """Mark quotation as SENT to client."""
         fq = self.get_object()
-        if fq.status != FormalQuotation.Status.DRAFT:
+        if fq.status not in (FormalQuotation.Status.DRAFT, FormalQuotation.Status.REVISED):
             return Response(
-                {"detail": "Only DRAFT quotations can be sent."},
+                {"detail": "Only DRAFT or REVISED quotations can be sent."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        old = fq.status
         fq.status = FormalQuotation.Status.SENT
         fq.save(update_fields=["status"])
         log_action(request=request, module=AuditLog.Module.SALES,
                    action=AuditLog.ActionType.SEND, object_type="FormalQuotation",
                    object_id=fq.id, object_repr=fq.quotation_number,
-                   old_status="DRAFT", new_status="SENT")
+                   old_status=old, new_status="SENT")
         return Response(FormalQuotationDetailSerializer(fq).data)
 
     @action(detail=True, methods=["post"])
@@ -80,6 +125,11 @@ class FormalQuotationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
         fq = self.get_object()
+        if fq.status not in (FormalQuotation.Status.SENT, FormalQuotation.Status.REVISED):
+            return Response(
+                {"detail": "Only SENT or REVISED quotations can be rejected."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         old = fq.status
         fq.status = FormalQuotation.Status.REJECTED
         fq.save(update_fields=["status"])
@@ -87,6 +137,24 @@ class FormalQuotationViewSet(viewsets.ModelViewSet):
                    action=AuditLog.ActionType.REJECT, object_type="FormalQuotation",
                    object_id=fq.id, object_repr=fq.quotation_number,
                    old_status=old, new_status="REJECTED")
+        return Response(FormalQuotationDetailSerializer(fq).data)
+
+    @action(detail=True, methods=["post"])
+    def win(self, request, pk=None):
+        """Mark quotation as WON — client accepted."""
+        fq = self.get_object()
+        if fq.status not in (FormalQuotation.Status.SENT, FormalQuotation.Status.REVISED):
+            return Response(
+                {"detail": "Only SENT or REVISED quotations can be marked as won."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        old = fq.status
+        fq.status = FormalQuotation.Status.WON
+        fq.save(update_fields=["status"])
+        log_action(request=request, module=AuditLog.Module.SALES,
+                   action=AuditLog.ActionType.ACCEPT, object_type="FormalQuotation",
+                   object_id=fq.id, object_repr=fq.quotation_number,
+                   old_status=old, new_status="WON")
         return Response(FormalQuotationDetailSerializer(fq).data)
 
 

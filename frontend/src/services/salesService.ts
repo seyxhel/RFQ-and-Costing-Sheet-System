@@ -2,6 +2,14 @@ import api from './api';
 
 const S = '/sales';
 
+export const clientAPI = {
+  list:   (params?: any)       => api.get(`${S}/clients/`, { params }),
+  get:    (id: number)         => api.get(`${S}/clients/${id}/`),
+  create: (d: any)             => api.post(`${S}/clients/`, d),
+  update: (id: number, d: any) => api.put(`${S}/clients/${id}/`, d),
+  delete: (id: number)         => api.delete(`${S}/clients/${id}/`),
+};
+
 export const formalQuotationAPI = {
   list:   (params?: any)       => api.get(`${S}/quotations/`, { params }),
   get:    (id: number)         => api.get(`${S}/quotations/${id}/`),
@@ -11,6 +19,8 @@ export const formalQuotationAPI = {
   send:   (id: number)         => api.post(`${S}/quotations/${id}/send/`),
   accept: (id: number)         => api.post(`${S}/quotations/${id}/accept/`),
   reject: (id: number)         => api.post(`${S}/quotations/${id}/reject/`),
+  win:    (id: number)         => api.post(`${S}/quotations/${id}/win/`),
+  revisions: (id: number)      => api.get(`${S}/quotations/${id}/revisions/`),
 };
 
 export const salesOrderAPI = {

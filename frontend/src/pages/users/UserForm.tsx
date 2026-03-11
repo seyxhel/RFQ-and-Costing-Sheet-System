@@ -6,8 +6,8 @@ import { userAPI } from '../../services/userService';
 import { toast } from 'sonner';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
-const ROLES = ['ADMIN', 'MANAGER', 'PROCUREMENT', 'FINANCE', 'VIEWER'];
-const EMPTY = { username: '', email: '', first_name: '', last_name: '', password: '', role: 'VIEWER', is_active: true };
+const ROLES = ['MANAGEMENT', 'SALES', 'PURCHASING'];
+const EMPTY = { username: '', email: '', first_name: '', last_name: '', password: '', role: 'SALES', is_active: true };
 
 export default function UserForm() {
   const { id } = useParams();

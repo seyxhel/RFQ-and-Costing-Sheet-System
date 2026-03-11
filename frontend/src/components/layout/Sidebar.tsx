@@ -3,9 +3,7 @@ import {
   LayoutDashboard,
   FileText,
   Truck,
-  ClipboardList,
   Calculator,
-  FlaskConical,
   Users,
   Settings,
   LogOut,
@@ -28,6 +26,7 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   path: string;
   section?: string;
+  roles?: string[];
 }
 
 interface SidebarProps {
@@ -38,34 +37,36 @@ interface SidebarProps {
 
 export function Sidebar({ currentPath, onNavigate, onExpandChange }: SidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { isAdmin, logout } = useAuth();
+  const { isManagement, logout, user } = useAuth();
 
   const handleMouseEnter = () => { setIsExpanded(true); onExpandChange?.(true); };
   const handleMouseLeave = () => { setIsExpanded(false); onExpandChange?.(false); };
 
-  const navItems: NavItem[] = [
+  const role = user?.role || '';
+
+  const allNavItems: (NavItem & { roles?: string[] })[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-    { id: 'rfq', label: 'RFQ List', icon: FileText, path: '/rfq', section: 'RFQ Module' },
-    { id: 'rfq-new', label: 'New RFQ', icon: ClipboardList, path: '/rfq/new' },
-    { id: 'suppliers', label: 'Suppliers', icon: Truck, path: '/suppliers' },
-    { id: 'quotations', label: 'Supplier Canvass', icon: FileText, path: '/quotations' },
+    { id: 'rfq', label: 'RFQ List', icon: FileText, path: '/rfq', section: 'RFQ Module', roles: ['SALES', 'MANAGEMENT', 'PURCHASING'] },
+    { id: 'suppliers', label: 'Suppliers', icon: Truck, path: '/suppliers', roles: ['PURCHASING', 'MANAGEMENT'] },
+    { id: 'quotations', label: 'Supplier Canvass', icon: FileText, path: '/quotations', roles: ['PURCHASING', 'MANAGEMENT'] },
     { id: 'products', label: 'Product Catalog', icon: Package, path: '/products', section: 'Products' },
     { id: 'categories', label: 'Categories', icon: FolderOpen, path: '/products/categories' },
-    { id: 'costing', label: 'Costing Sheets', icon: Calculator, path: '/costing', section: 'Costing Module' },
-    { id: 'costing-new', label: 'New Costing Sheet', icon: FlaskConical, path: '/costing/new' },
-    { id: 'sales-quotations', label: 'Formal Quotations', icon: Send, path: '/sales/quotations', section: 'Sales Module' },
-    { id: 'sales-orders', label: 'Sales Orders', icon: Award, path: '/sales/orders' },
-    { id: 'contract-analysis', label: 'Contract Analysis', icon: FilePieChart, path: '/sales/contract-analyses' },
-    { id: 'budgets', label: 'Budgets', icon: Wallet, path: '/budgets', section: 'Budget & Procurement' },
-    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders' },
-    { id: 'variance', label: 'Variance Monitor', icon: BarChart3, path: '/variance' },
-    { id: 'audit-log', label: 'Audit Log', icon: ClipboardCheck, path: '/audit-log', section: 'Reports' },
-    { id: 'project-report', label: 'Project Report', icon: FileBarChart, path: '/reports/project' },
-    ...(isAdmin() ? [
+    { id: 'costing', label: 'Costing Sheets', icon: Calculator, path: '/costing', section: 'Costing Module', roles: ['MANAGEMENT'] },
+    { id: 'sales-quotations', label: 'Formal Quotations', icon: Send, path: '/sales/quotations', section: 'Sales Module', roles: ['SALES', 'MANAGEMENT'] },
+    { id: 'sales-orders', label: 'Sales Orders', icon: Award, path: '/sales/orders', roles: ['SALES', 'MANAGEMENT'] },
+    { id: 'contract-analysis', label: 'Contract Analysis', icon: FilePieChart, path: '/sales/contract-analyses', roles: ['SALES', 'MANAGEMENT'] },
+    { id: 'budgets', label: 'Budgets', icon: Wallet, path: '/budgets', section: 'Budget & Procurement', roles: ['MANAGEMENT'] },
+    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, path: '/purchase-orders', roles: ['PURCHASING', 'MANAGEMENT'] },
+    { id: 'variance', label: 'Variance Monitor', icon: BarChart3, path: '/variance', roles: ['MANAGEMENT'] },
+    { id: 'audit-log', label: 'Audit Log', icon: ClipboardCheck, path: '/audit-log', section: 'Reports', roles: ['MANAGEMENT'] },
+    { id: 'project-report', label: 'Project Report', icon: FileBarChart, path: '/reports/project', roles: ['MANAGEMENT'] },
+    ...(isManagement() ? [
       { id: 'users', label: 'Manage Users', icon: Users, path: '/users', section: 'Admin' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
     ] : []),
   ];
+
+  const navItems = allNavItems.filter((item) => !item.roles || item.roles.includes(role));
 
   const isActive = (path: string) => {
     if (path === '/') return currentPath === '/';
@@ -89,12 +90,14 @@ export function Sidebar({ currentPath, onNavigate, onExpandChange }: SidebarProp
     >
       {/* Logo */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex flex-col items-center">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white font-bold text-lg">
-          B
-        </div>
+        <img
+          src="/Maptech%20Official%20Logo%20version2%20(1).png"
+          alt="Maptech"
+          className={`object-contain transition-all duration-300 ${isExpanded ? 'h-14' : 'h-10'}`}
+        />
         {isExpanded && (
           <span className="text-xs text-gray-500 dark:text-gray-400 text-center tracking-wide font-medium leading-tight mt-2">
-            Business System
+            RFQ & Costing
           </span>
         )}
       </div>

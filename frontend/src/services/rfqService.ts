@@ -11,6 +11,7 @@ export const rfqAPI = {
   submit: (id: number) => api.post(`${R}/rfqs/${id}/submit/`),
   approve:(id: number, d?: any) => api.post(`${R}/rfqs/${id}/approve/`, d),
   reject: (id: number, d?: any) => api.post(`${R}/rfqs/${id}/reject/`, d),
+  completeCanvass: (id: number) => api.post(`${R}/rfqs/${id}/complete_canvass/`),
   compare:(id: number) => api.get(`${R}/rfqs/${id}/compare/`),
 };
 

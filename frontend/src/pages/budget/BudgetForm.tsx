@@ -5,8 +5,9 @@ import { GreenButton } from '../../components/ui/GreenButton';
 import { budgetAPI } from '../../services/budgetService';
 import { rfqAPI } from '../../services/rfqService';
 import { costingAPI } from '../../services/costingService';
+import { salesOrderAPI } from '../../services/salesService';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShoppingCart } from 'lucide-react';
 
 export default function BudgetForm() {
   const { id } = useParams();
@@ -15,10 +16,11 @@ export default function BudgetForm() {
 
   const [form, setForm] = useState({
     title: '', description: '', allocated_amount: '', rfq: '' as string | number,
-    costing_sheet: '' as string | number, notes: '',
+    costing_sheet: '' as string | number, sales_order: '' as string | number, notes: '',
   });
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [costings, setCostings] = useState<any[]>([]);
+  const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -26,9 +28,11 @@ export default function BudgetForm() {
     Promise.all([
       rfqAPI.list().catch(() => ({ data: [] })),
       costingAPI.list().catch(() => ({ data: [] })),
-    ]).then(([rRes, cRes]) => {
+      salesOrderAPI.list().catch(() => ({ data: [] })),
+    ]).then(([rRes, cRes, soRes]) => {
       setRfqs(rRes.data.results || rRes.data || []);
       setCostings(cRes.data.results || cRes.data || []);
+      setSalesOrders(soRes.data.results || soRes.data || []);
     });
 
     if (isEdit) {
@@ -38,7 +42,8 @@ export default function BudgetForm() {
         setForm({
           title: d.title || '', description: d.description || '',
           allocated_amount: d.allocated_amount || '', rfq: d.rfq || '',
-          costing_sheet: d.costing_sheet || '', notes: d.notes || '',
+          costing_sheet: d.costing_sheet || '', sales_order: d.sales_order || '',
+          notes: d.notes || '',
         });
         setLoading(false);
       }).catch(() => { toast.error('Failed to load budget'); navigate('/budgets'); });
@@ -47,6 +52,24 @@ export default function BudgetForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  };
+
+  const handleSalesOrderSelect = (soId: string) => {
+    if (!soId) {
+      setForm(p => ({ ...p, sales_order: '' }));
+      return;
+    }
+    const so = salesOrders.find((s: any) => s.id === Number(soId));
+    if (so) {
+      setForm(p => ({
+        ...p,
+        sales_order: so.id,
+        title: so.project_title || p.title,
+        allocated_amount: so.contract_amount || p.allocated_amount,
+        rfq: so.rfq || p.rfq,
+        costing_sheet: so.costing_sheet || p.costing_sheet,
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,6 +81,7 @@ export default function BudgetForm() {
         allocated_amount: form.allocated_amount || 0,
         rfq: form.rfq ? Number(form.rfq) : null,
         costing_sheet: form.costing_sheet ? Number(form.costing_sheet) : null,
+        sales_order: form.sales_order ? Number(form.sales_order) : null,
       };
       if (isEdit) {
         await budgetAPI.update(Number(id), payload);
@@ -87,7 +111,34 @@ export default function BudgetForm() {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* Linked Sales Order */}
         <Card accent>
+          <div className="flex items-center gap-2 mb-4">
+            <ShoppingCart className="w-5 h-5 text-[#3BC25B]" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Linked Sales Order</h2>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Sales Order</label>
+            <select
+              name="sales_order"
+              value={form.sales_order}
+              onChange={e => handleSalesOrderSelect(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none"
+            >
+              <option value="">— Select a Sales Order (optional) —</option>
+              {salesOrders.map((so: any) => (
+                <option key={so.id} value={so.id}>
+                  {so.so_number} — {so.client_name} — {so.project_title} (₱{Number(so.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })})
+                </option>
+              ))}
+            </select>
+            {salesOrders.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No sales orders available.</p>
+            )}
+          </div>
+        </Card>
+
+        <Card accent className="mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Title <span className="text-red-500">*</span></label>

@@ -25,6 +25,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             "id", "sku", "name", "description",
             "category", "category_name",
+            "brand", "model_number",
             "unit", "specifications",
             "estimated_unit_cost",
             "rfq", "rfq_number",

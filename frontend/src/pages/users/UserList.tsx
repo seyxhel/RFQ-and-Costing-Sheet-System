@@ -7,7 +7,7 @@ import { Search, Plus, MoreHorizontal, Pencil, Trash2, Users, Shield } from 'luc
 import { userAPI } from '../../services/userService';
 import { toast } from 'sonner';
 
-const ROLE_TABS = ['All', 'admin', 'manager', 'procurement', 'finance', 'viewer'];
+const ROLE_TABS = ['All', 'management', 'sales', 'purchasing'];
 
 export default function UserList() {
   const navigate = useNavigate();

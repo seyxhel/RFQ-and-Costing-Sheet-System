@@ -6,12 +6,12 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { rfqAPI } from '../../services/rfqService';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
-import { ArrowLeft, Send, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle, XCircle, BarChart3, ClipboardCheck } from 'lucide-react';
 
 export default function RFQDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canApprove } = useAuth();
+  const { canApprove, user } = useAuth();
   const [rfq, setRfq] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -20,11 +20,15 @@ export default function RFQDetail() {
   }, [id, navigate]);
 
   const handleSubmit = () => {
-    rfqAPI.submit(Number(id)).then((r) => { setRfq(r.data); toast.success('RFQ submitted for approval'); }).catch((e) => toast.error(e.response?.data?.detail || 'Failed'));
+    rfqAPI.submit(Number(id)).then((r) => { setRfq(r.data); toast.success('RFQ submitted to purchasing'); }).catch((e) => toast.error(e.response?.data?.detail || 'Failed'));
   };
 
   const handleApprove = (approved: boolean) => {
     rfqAPI.approve(Number(id), { approved, comments: approved ? 'Approved' : 'Rejected' }).then((r) => { setRfq(r.data); toast.success(approved ? 'RFQ approved' : 'RFQ rejected'); }).catch((e) => toast.error(e.response?.data?.detail || 'Failed'));
+  };
+
+  const handleCompleteCanvass = () => {
+    rfqAPI.completeCanvass(Number(id)).then((r) => { setRfq(r.data); toast.success('Canvass marked as complete'); }).catch((e) => toast.error(e.response?.data?.detail || 'Failed'));
   };
 
   if (loading) return <p className="text-gray-400 p-8">Loading...</p>;
@@ -85,9 +89,12 @@ export default function RFQDetail() {
             <h3 className="font-bold text-gray-900 dark:text-white mb-4">Actions</h3>
             <div className="space-y-3">
               {rfq.status === 'DRAFT' && (
-                <GreenButton fullWidth onClick={handleSubmit}><Send className="w-4 h-4 mr-2" /> Submit for Approval</GreenButton>
+                <GreenButton fullWidth onClick={handleSubmit}><Send className="w-4 h-4 mr-2" /> Submit to Purchasing</GreenButton>
               )}
-              {['SUBMITTED', 'UNDER_REVIEW'].includes(rfq.status) && canApprove() && (
+              {rfq.status === 'PENDING_FOR_CANVASS' && user?.role === 'PURCHASING' && (
+                <GreenButton fullWidth onClick={handleCompleteCanvass}><ClipboardCheck className="w-4 h-4 mr-2" /> Mark Canvass Complete</GreenButton>
+              )}
+              {['CANVASS_DONE', 'UNDER_REVIEW'].includes(rfq.status) && canApprove() && (
                 <>
                   <GreenButton fullWidth onClick={() => handleApprove(true)}><CheckCircle className="w-4 h-4 mr-2" /> Approve</GreenButton>
                   <GreenButton fullWidth variant="danger" onClick={() => handleApprove(false)}><XCircle className="w-4 h-4 mr-2" /> Reject</GreenButton>

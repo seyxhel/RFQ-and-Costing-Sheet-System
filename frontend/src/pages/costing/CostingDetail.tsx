@@ -9,7 +9,7 @@ import { ArrowLeft, Pencil, RefreshCw, Camera, History, ChevronDown, ChevronUp, 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const CATEGORY_COLORS = ['#3BC25B', '#3B82F6', '#A855F7', '#F59E0B', '#EF4444', '#06B6D4', '#F97316'];
-const MARGIN_DISPLAY: Record<string, string> = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High' };
+const MARGIN_DISPLAY: Record<string, string> = { VERY_LOW: 'Very Low', LOW: 'Low', MEDIUM_LOW: 'Medium-Low', MEDIUM_HIGH: 'Medium-High', HIGH: 'High', VERY_HIGH: 'Very High', CUSTOM: 'Custom' };
 const fmt = (v: any) => `₱${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
 export default function CostingDetail() {
@@ -296,16 +296,19 @@ export default function CostingDetail() {
       {marginLevels.length > 0 && (
         <Card accent title="Margin Level Analysis">
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
-            {marginLevels.map((m: any) => (
+          <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700 mb-6">
+            {marginLevels.map((m: any) => {
+              const isCustom = m.label === 'CUSTOM';
+              return (
               <button key={m.label} onClick={() => setActiveMargin(m.label)}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${activeMargin === m.label
-                  ? 'border-[#3BC25B] text-[#0E8F79] dark:text-[#3BC25B]'
+                className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${activeMargin === m.label
+                  ? isCustom ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-[#3BC25B] text-[#0E8F79] dark:text-[#3BC25B]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
                 {MARGIN_DISPLAY[m.label] || m.label}
-                <span className="ml-2 text-xs opacity-70">{fmt(m.net_selling_vat_inc)}</span>
+                <span className="ml-1 text-xs opacity-70">{fmt(m.net_selling_vat_inc)}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {ml && (
