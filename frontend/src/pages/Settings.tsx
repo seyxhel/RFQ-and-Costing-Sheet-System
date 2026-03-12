@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { GreenButton } from '../components/ui/GreenButton';
-import { User, Lock, Mail, Phone, Building, Sun, Moon, Tag, Users, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { User, Lock, Mail, Sun, Moon, Tag, Users, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
@@ -21,8 +21,6 @@ export default function Settings() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [department, setDepartment] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Change password state
@@ -49,8 +47,6 @@ export default function Settings() {
       setFirstName(user.first_name || '');
       setLastName(user.last_name || '');
       setEmail(user.email || '');
-      setPhone(user.phone || '');
-      setDepartment(user.department || '');
     }
   }, [user]);
 
@@ -71,8 +67,6 @@ export default function Settings() {
         first_name: firstName,
         last_name: lastName,
         email,
-        phone,
-        department,
       });
       await refreshUser();
       toast.success('Profile updated successfully');
@@ -214,32 +208,6 @@ export default function Settings() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. john@example.com"
-                  className={inputCls + ' pl-10'}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelCls}>Phone Number</label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. 09171234567"
-                  className={inputCls + ' pl-10'}
-                />
-              </div>
-            </div>
-            <div className="md:col-span-2">
-              <label className={labelCls}>Department</label>
-              <div className="relative">
-                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="e.g. Engineering"
                   className={inputCls + ' pl-10'}
                 />
               </div>

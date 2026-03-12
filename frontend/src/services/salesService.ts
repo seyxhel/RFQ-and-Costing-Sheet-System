@@ -42,3 +42,7 @@ export const contractAnalysisAPI = {
   delete:      (id: number)         => api.delete(`${S}/contract-analyses/${id}/`),
   recalculate: (id: number)         => api.post(`${S}/contract-analyses/${id}/recalculate/`),
 };
+
+export const salesDashboardAPI = {
+  summary: () => api.get(`${S}/dashboard-summary/`),
+};

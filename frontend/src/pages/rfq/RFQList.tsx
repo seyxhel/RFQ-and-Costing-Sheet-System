@@ -10,11 +10,14 @@ import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 8;
 
+const STATUS_OPTIONS = ['Draft', 'Sent', 'Won', 'Rejected'];
+
 export default function RFQList() {
   const navigate = useNavigate();
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -45,9 +48,10 @@ export default function RFQList() {
   };
 
   const filtered = rfqs.filter((r) => {
-    if (!search) return true;
     const q = search.toLowerCase();
-    return r.title?.toLowerCase().includes(q) || r.rfq_number?.toLowerCase().includes(q);
+    const matchSearch = !search || r.title?.toLowerCase().includes(q) || r.rfq_number?.toLowerCase().includes(q);
+    const matchStatus = !filterStatus || r.status === filterStatus;
+    return matchSearch && matchStatus;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -69,6 +73,10 @@ export default function RFQList() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} type="text" placeholder="Search by title or RFQ number..." className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" />
           </div>
+          <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }} className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]">
+            <option value="">All Statuses</option>
+            {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
         </div>
 
         <div className="overflow-x-auto overflow-y-visible relative">

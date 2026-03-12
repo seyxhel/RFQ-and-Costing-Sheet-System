@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/v1/sales/", include("sales.urls")),
     path("api/v1/budget/", include("budget.urls")),
     path("api/v1/procurement/", include("procurement.urls")),
+    path("api/v1/notifications/", include("notifications.urls")),
 
     # DRF browsable API auth (dev convenience)
     path("api-auth/", include("rest_framework.urls")),

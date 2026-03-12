@@ -31,7 +31,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       <div className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarExpanded ? 'lg:pl-64' : 'lg:pl-20'}`}>
-        <TopNav isDark={isDark} onToggleDark={toggleDark} onMenuClick={() => setIsSidebarOpen(true)} onNavigate={handleNavigate} />
+        <TopNav isDark={isDark} onToggleDark={toggleDark} onMenuClick={() => setIsSidebarOpen(true)} onNavigate={handleNavigate} isSidebarExpanded={isSidebarExpanded} />
         <main className="flex-1 p-6 mt-16 overflow-x-hidden">
           <div className="max-w-7xl mx-auto space-y-6">{children}</div>
         </main>

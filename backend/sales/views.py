@@ -3,11 +3,14 @@
 # ============================================================================
 
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes as perm_classes
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Sum, Count, F
+from django.utils import timezone
+from datetime import timedelta
 
 from accounts.models import AuditLog, log_action
+from rfq.models import RFQ
 from .models import FormalQuotation, SalesOrder, ContractAnalysis, Client, QuotationRevision
 from .serializers import (
     ClientSerializer,
@@ -252,3 +255,109 @@ class ContractAnalysisViewSet(viewsets.ModelViewSet):
                    action=AuditLog.ActionType.RECALCULATE, object_type="ContractAnalysis",
                    object_id=analysis.id, object_repr=f"CA-{analysis.id}")
         return Response(ContractAnalysisSerializer(analysis).data)
+
+
+# ── Sales Dashboard Summary ────────────────────────────────────────
+@api_view(["GET"])
+@perm_classes([permissions.IsAuthenticated])
+def sales_dashboard_summary(request):
+    """Aggregated KPIs for the sales dashboard."""
+    now = timezone.now()
+    thirty_days_ago = now - timedelta(days=30)
+
+    # RFQ counts
+    rfqs = RFQ.objects.all()
+    rfq_total = rfqs.count()
+    rfq_draft = rfqs.filter(status="DRAFT").count()
+    rfq_pending = rfqs.filter(status__in=["PENDING_FOR_CANVASS", "UNDER_REVIEW"]).count()
+    rfq_approved = rfqs.filter(status="APPROVED").count()
+
+    # Formal Quotation counts & values
+    fqs = FormalQuotation.objects.all()
+    fq_total = fqs.count()
+    fq_sent = fqs.filter(status="SENT").count()
+    fq_won = fqs.filter(status="WON").count()
+    fq_rejected = fqs.filter(status="REJECTED").count()
+    fq_draft = fqs.filter(status="DRAFT").count()
+    fq_total_value = fqs.aggregate(s=Sum("total_amount"))["s"] or 0
+    fq_won_value = fqs.filter(status="WON").aggregate(s=Sum("total_amount"))["s"] or 0
+    fq_pipeline_value = fqs.filter(status__in=["DRAFT", "SENT", "REVISED"]).aggregate(s=Sum("total_amount"))["s"] or 0
+
+    # Win rate
+    decided = fq_won + fq_rejected
+    win_rate = round((fq_won / decided * 100), 1) if decided > 0 else 0
+
+    # Sales Orders
+    sos = SalesOrder.objects.all()
+    so_total = sos.count()
+    so_confirmed = sos.filter(status="CONFIRMED").count()
+    so_in_progress = sos.filter(status="IN_PROGRESS").count()
+    so_completed = sos.filter(status="COMPLETED").count()
+    so_total_value = sos.aggregate(s=Sum("contract_amount"))["s"] or 0
+    so_completed_value = sos.filter(status="COMPLETED").aggregate(s=Sum("contract_amount"))["s"] or 0
+
+    # Clients
+    client_count = Client.objects.count()
+
+    # Recent activity (last 30 days)
+    recent_rfqs = rfqs.filter(created_at__gte=thirty_days_ago).count()
+    recent_fqs = fqs.filter(created_at__gte=thirty_days_ago).count()
+    recent_sos = sos.filter(created_at__gte=thirty_days_ago).count()
+
+    # Quotation status breakdown for chart
+    fq_by_status = list(
+        fqs.values("status").annotate(count=Count("id")).order_by("status")
+    )
+
+    # Recent won quotations (return 15 instead of 5)
+    recent_wins = list(
+        fqs.filter(status="WON")
+        .order_by("-updated_at")[:15]
+        .values("id", "quotation_number", "project_title", "client_name", "total_amount", "updated_at")
+    )
+
+    # Top quotations by value (pipeline)
+    top_pipeline = list(
+        fqs.filter(status__in=["DRAFT", "SENT", "REVISED"])
+        .order_by("-total_amount")[:5]
+        .values("id", "quotation_number", "project_title", "client_name", "total_amount", "status")
+    )
+
+    return Response({
+        "rfq": {
+            "total": rfq_total,
+            "draft": rfq_draft,
+            "pending": rfq_pending,
+            "approved": rfq_approved,
+        },
+        "quotations": {
+            "total": fq_total,
+            "draft": fq_draft,
+            "sent": fq_sent,
+            "won": fq_won,
+            "rejected": fq_rejected,
+            "total_value": float(fq_total_value),
+            "won_value": float(fq_won_value),
+            "pipeline_value": float(fq_pipeline_value),
+            "win_rate": win_rate,
+            "by_status": fq_by_status,
+        },
+        "sales_orders": {
+            "total": so_total,
+            "confirmed": so_confirmed,
+            "in_progress": so_in_progress,
+            "completed": so_completed,
+            "total_value": float(so_total_value),
+            "completed_value": float(so_completed_value),
+        },
+        "clients": {
+            "total": client_count,
+        },
+        "recent_activity": {
+            "rfqs_30d": recent_rfqs,
+            "quotations_30d": recent_fqs,
+            "orders_30d": recent_sos,
+        },
+        "recent_wins": recent_wins,
+        "top_pipeline": top_pipeline,
+    })

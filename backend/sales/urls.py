@@ -13,5 +13,6 @@ router.register(r"orders", views.SalesOrderViewSet, basename="salesorder")
 router.register(r"contract-analyses", views.ContractAnalysisViewSet, basename="contractanalysis")
 
 urlpatterns = [
+    path("dashboard-summary/", views.sales_dashboard_summary, name="sales-dashboard-summary"),
     path("", include(router.urls)),
 ]

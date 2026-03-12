@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "sales",                    # Formal Quotation, Sales Order, Contract Analysis
     "budget",                   # Budget allocation & approval
     "procurement",              # Purchase Orders & actual cost tracking
+    "notifications",            # In-app notifications
 ]
 
 # --------------------------------------------------------------------------
